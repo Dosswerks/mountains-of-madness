@@ -1,0 +1,2499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Mountains of Madness — A Dosswerks Arcade Game</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a1a;display:flex;justify-content:center;align-items:flex-start;min-height:100vh;font-family:'Courier New',monospace;overflow-y:auto}
+#game-container{display:flex;flex-direction:column;align-items:center;width:100%;max-width:480px;padding:4px}
+#hud{display:flex;justify-content:space-between;width:100%;color:#fff;font-size:14px;padding:4px 8px;background:#111;border:1px solid #fff;border-bottom:none}
+#hud span{flex:1;text-align:center}
+canvas{display:block;width:100%;height:auto;border:1px solid #fff}
+#touch-controls{display:none;width:100%;padding:8px 0;justify-content:space-between;align-items:center}
+#touch-left-group{display:flex;gap:8px}
+#touch-right-group{display:flex;gap:8px}
+.touch-btn{width:56px;height:56px;border:2px solid #fff;background:rgba(255,255,255,0.1);color:#fff;font-size:18px;font-weight:bold;border-radius:8px;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:manipulation;cursor:pointer}
+.touch-btn:active{background:rgba(255,255,255,0.4)}
+#credits{width:100%;text-align:center;color:#888;font-size:11px;padding:8px 4px;line-height:1.6}
+#credits a{color:#aaa;text-decoration:none}
+#credits a:hover{color:#fff;text-decoration:underline}
+@media(max-width:500px){
+  #touch-controls{display:flex!important}
+  #game-container{padding:2px}
+  #hud{font-size:12px}
+}
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div id="hud">
+    <span id="hud-score">SCORE: 0</span>
+    <span id="hud-level">LEVEL: 1</span>
+    <span id="hud-lives">LIVES: 3</span>
+  </div>
+  <canvas id="gameCanvas" width="480" height="600"></canvas>
+  <div id="touch-controls">
+    <div id="touch-left-group">
+      <button class="touch-btn" id="btn-left">◀</button>
+      <button class="touch-btn" id="btn-right">▶</button>
+      <button class="touch-btn" id="btn-up">▲</button>
+    </div>
+    <div id="touch-right-group">
+      <button class="touch-btn" id="btn-shield">SH</button>
+      <button class="touch-btn" id="btn-fire">FIRE</button>
+    </div>
+  </div>
+  <div id="credits">Based on <a href="https://www.hplovecraft.com/writings/fiction/mm.aspx" target="_blank"><em></em>At the Mountains of Madness</em></a> by H.P. Lovecraft.<br>A game by <a href="https://www.andrewdoss.com" target="_blank">Andrew Doss</a>.</div>
+</div>
+
+<script>
+// ============================================================
+// MOUNTAINS OF MADNESS — A Dosswerks Arcade Game
+// Single-file HTML5 Canvas arcade game
+// ============================================================
+
+// ---- GAME CONSTANTS ----
+const CANVAS_W = 480;
+const CANVAS_H = 600;
+const PLAYER_Y = 560;
+const PLAYER_SPEED = 4;
+const PLAYER_W = 50;
+const PLAYER_H = 50;
+const PLAYER_MAX_PROJECTILES = 2;
+const PLAYER_SHOT_COOLDOWN = 10;
+const SHIELD_MAX_ENERGY = 120;    // frames of full shield (~2s at 60fps)
+const SHIELD_DRAIN_RATE = 1.5;    // energy per frame while active
+const SHIELD_RECHARGE_RATE = 0.4; // energy per frame while inactive
+const SHIELD_MIN_ACTIVATE = 30;   // minimum energy needed to activate
+const INVINCIBILITY_DURATION = 120;
+const DEATH_PAUSE_DURATION = 90;
+const TRANSITION_DURATION = 120;
+const WAVE_TRANSITION_DURATION = 60;
+
+const ELDER_THING_W = 48;
+const ELDER_THING_H = 72;
+const ELDER_THING_ANIM_INTERVAL = 12; // frames between sprite swap
+const ELDER_THING_POINTS = 100;
+const ELDER_THING_BASE_SPEED = 1.5;
+
+const SHOGGOTH_FULL_W = 256;
+const SHOGGOTH_FULL_H = 192;
+const SHOGGOTH_HALF_W = 160;
+const SHOGGOTH_HALF_H = 128;
+const SHOGGOTH_QUARTER_W = 96;
+const SHOGGOTH_QUARTER_H = 80;
+const SHOGGOTH_SPLIT_INVINCIBILITY = 30;
+const SHOGGOTH_ANIM_INTERVAL = 12;
+
+const PROJECTILE_PLAYER_SPEED = 7;
+const PROJECTILE_ENEMY_BASE_SPEED = 3;
+const MAX_ENEMY_PROJECTILES = 30;
+const SPIRAL_AMPLITUDE = 6;
+const SPIRAL_SPEED = 0.075;
+
+const BARRIER_COUNT = 1;
+const BARRIER_W = 96;
+const BARRIER_H = 72;
+const BARRIER_BLOCK_SIZE = 3;
+const BARRIER_EROSION_RADIUS = 2;
+
+const BONUS_FLYOVER_SPEED = 1.78;
+const BONUS_FLYOVER_POINTS = 1000;
+const BONUS_FIRST_SPAWN_DELAY = 300;
+const BONUS_RESPAWN_MIN = 600;
+const BONUS_RESPAWN_MAX = 1200;
+const BONUS_MIN_ENEMIES = 3;
+
+const MAX_PARTICLES = 50;
+const EXTRA_LIFE_INTERVAL = 10000;
+const STARTING_LIVES = 3;
+const BASE_CAMPSITE_PIECES = 3;
+const MAX_CAMPSITE_PIECES = 8;
+const EXPLOSIVE_W = 20;
+const EXPLOSIVE_H = 20;
+const EXPLOSIVE_COUNTDOWN = 180; // 3 seconds at 60fps
+const EXPLOSIVE_BLAST_RADIUS = 60; // pixels - kills player if too close
+const SEAL_X = CANVAS_W - 80; // right side of screen
+const SEAL_Y = PLAYER_Y - 30; // near bottom
+const SEAL_BOULDER_W = 36;
+const SEAL_BOULDER_H = 30;
+const SEAL_COLS = 3;
+const SEAL_ROWS = 3;
+const MAX_ELDER_THINGS = 16;
+const MAX_SHOGGOTHS = 4; // full splits to 2 half, each to 2 quarter = 4 quarter max
+
+// ---- ASSET CONFIG ----
+const ASSET_CONFIG = {
+  sprites: {
+    player:'assets/player.png',elder_thing_1:'assets/elder_thing_1.png',elder_thing_2:'assets/elder_thing_2.png',
+    shoggoth_full_1:'assets/shoggoth_full_1.png',shoggoth_full_2:'assets/shoggoth_full_2.png',
+    shoggoth_half_1:'assets/shoggoth_half_1.png',shoggoth_half_2:'assets/shoggoth_half_2.png',
+    shoggoth_quarter_1:'assets/shoggoth_quarter_1.png',shoggoth_quarter_2:'assets/shoggoth_quarter_2.png',
+    bonus_flyover:'assets/bonus_flyover.png',campsite:'assets/campsite.png',seal_boulder:'assets/seal_boulder.png',
+    projectile_player:'assets/projectile_player.png',projectile_enemy:'assets/projectile_enemy.png',projectile_spiral:'assets/projectile_spiral.png',bonus_drop:'assets/bonus_drop.png',
+    bg_campsite:'assets/bg_campsite.png',bg_icecave:'assets/bg_icecave.png',bg_gameover:'assets/bg_gameover.png',
+    box_art:'assets/box_art.png'
+  },
+  audio: {
+    music_campsite:'assets/music_campsite.mp3',music_icecave:'assets/music_icecave.mp3',
+    sfx_player_fire:'assets/sfx_player_fire.mp3',sfx_player_hit:'assets/sfx_player_hit.mp3',
+    sfx_elder_destroy:'assets/sfx_elder_destroy.mp3',sfx_elder_fire:'assets/sfx_elder_fire.mp3',
+    sfx_shoggoth_split:'assets/sfx_shoggoth_split.mp3',sfx_shoggoth_destroy:'assets/sfx_shoggoth_destroy.mp3',
+    sfx_bonus_appear:'assets/sfx_bonus_appear.mp3',sfx_bonus_hit:'assets/sfx_bonus_hit.mp3',
+    sfx_piece_pickup:'assets/sfx_piece_pickup.mp3',sfx_piece_place:'assets/sfx_piece_place.mp3',
+    sfx_campsite_complete:'assets/sfx_campsite_complete.mp3',sfx_seal_explosion:'assets/sfx_seal_explosion.mp3',sfx_barrier_hit:'assets/sfx_barrier_hit.mp3',
+    sfx_transition:'assets/sfx_transition.mp3',sfx_wave_start:'assets/sfx_wave_start.mp3',
+    sfx_game_over:'assets/sfx_game_over.mp3',sfx_game_start:'assets/sfx_game_start.mp3',sfx_boss_start:'assets/sfx_boss_start.mp3'
+  }
+};
+
+// ---- DOM REFS ----
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const hudScore = document.getElementById('hud-score');
+const hudLevel = document.getElementById('hud-level');
+const hudLives = document.getElementById('hud-lives');
+
+// ---- DIFFICULTY SYSTEM ----
+function enemyCount(level) { return Math.min(8 + level - 1, 16); }
+function campsitePiecesRequired(level) { return Math.min(3 + level - 1, MAX_CAMPSITE_PIECES); }
+function enemyFireInterval(level) { return Math.max(120 - (level - 1) * 10, 40); }
+function enemySpeed(level) { return Math.min(1.0 + (level - 1) * 0.15, 2.5); }
+function enemyProjectileSpeed(level) { return Math.min(3.0 + (level - 1) * 0.3, 6.0); }
+function diveFrequency(level) { return Math.min(0.005 + (level - 1) * 0.003, 0.025); }
+function shoggothBaseSpeed(level) { return Math.min(1.5 + (level - 1) * 0.2, 3.5); }
+
+// ---- SPRITE LOADER ----
+const sprites = {};
+function loadSprites() {
+  for (const [key, path] of Object.entries(ASSET_CONFIG.sprites)) {
+    const img = new Image();
+    img.onload = () => { sprites[key] = img; };
+    img.onerror = () => { sprites[key] = null; console.warn('Sprite load failed:', key); };
+    img.src = path;
+  }
+}
+
+function drawSprite(ctx, key, x, y, w, h) {
+  if (sprites[key]) {
+    ctx.drawImage(sprites[key], x - w/2, y - h/2, w, h);
+    return true;
+  }
+  return false;
+}
+
+// ---- AUDIO MANAGER ----
+const AudioMgr = {
+  ctx: null, buffers: {}, currentMusic: null, currentMusicGain: null, muted: false,
+  _loaded: false, _loading: false,
+  init() {
+    if (this.ctx) return;
+    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e) { console.warn('AudioContext failed:', e); }
+    // Load audio buffers after context is created (lazy loading)
+    if (this.ctx && !this._loaded && !this._loading) {
+      this.loadAll().catch(() => {});
+    }
+  },
+  async loadAll() {
+    if (!this.ctx) return;
+    if (this._loading) return;
+    this._loading = true;
+    for (const [key, path] of Object.entries(ASSET_CONFIG.audio)) {
+      try {
+        const resp = await fetch(path);
+        if (!resp.ok) throw new Error('fetch failed');
+        const buf = await resp.arrayBuffer();
+        this.buffers[key] = await this.ctx.decodeAudioData(buf);
+      } catch(e) { this.buffers[key] = null; console.warn('Audio load failed:', key); }
+    }
+    this._loaded = true;
+    this._loading = false;
+    // Play any music that was requested while loading
+    if (this._pendingMusic) {
+      this.playMusic(this._pendingMusic);
+    }
+    if (this._pendingSFX) {
+      this.playSFX(this._pendingSFX.name, this._pendingSFX.vol);
+      this._pendingSFX = null;
+    }
+  },
+  playSFX(name, vol) {
+    if (!this.ctx || this.muted) return;
+    if (!this._loaded) {
+      this._pendingSFX = { name, vol };
+      return;
+    }
+    if (!this.buffers[name]) return;
+    try {
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.buffers[name];
+      if (vol !== undefined && vol < 1) {
+        const gain = this.ctx.createGain();
+        gain.gain.value = vol;
+        src.connect(gain);
+        gain.connect(this.ctx.destination);
+      } else {
+        src.connect(this.ctx.destination);
+      }
+      src.start(0);
+    } catch(e) {}
+  },
+  playMusic(track) {
+    if (!this.ctx) return;
+    const key = 'music_' + track;
+    // If buffers aren't loaded yet, wait for them then play
+    if (!this._loaded) {
+      this._pendingMusic = track;
+      return;
+    }
+    this._pendingMusic = null;
+    if (!this.buffers[key]) { this.stopMusic(); return; }
+    try {
+      // Crossfade: fade out old track over 0.5s, fade in new track
+      const now = this.ctx.currentTime;
+      if (this.currentMusic && this.currentMusicGain) {
+        const oldSrc = this.currentMusic;
+        const oldGain = this.currentMusicGain;
+        oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+        oldGain.gain.linearRampToValueAtTime(0, now + 0.5);
+        try { oldSrc.stop(now + 0.5); } catch(e) {}
+      }
+      const src = this.ctx.createBufferSource();
+      const gain = this.ctx.createGain();
+      src.buffer = this.buffers[key];
+      src.loop = true;
+      src.connect(gain);
+      gain.connect(this.ctx.destination);
+      const targetVol = this.muted ? 0 : 0.5;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(targetVol, now + 0.5);
+      src.start(0);
+      this.currentMusic = src;
+      this.currentMusicGain = gain;
+    } catch(e) {}
+  },
+  stopMusic() {
+    if (this.currentMusic) {
+      try { this.currentMusic.stop(); } catch(e) {}
+      this.currentMusic = null;
+      this.currentMusicGain = null;
+    }
+    this.musicPaused = false;
+    this.musicWasPlaying = false;
+  },
+  pauseMusic() {
+    if (this.ctx && this.currentMusic) {
+      try { this.ctx.suspend(); this.musicPaused = true; this.musicWasPlaying = true; } catch(e) {}
+    } else {
+      this.musicPaused = false;
+      this.musicWasPlaying = false;
+    }
+  },
+  resumeMusic() {
+    if (this.ctx && this.musicWasPlaying) {
+      try { this.ctx.resume(); this.musicPaused = false; } catch(e) {}
+    }
+    this.musicWasPlaying = false;
+  },
+  musicPaused: false,
+  musicWasPlaying: false,
+  setMuted(m) { this.muted = m; if (this.currentMusicGain) this.currentMusicGain.gain.value = m ? 0 : 0.5; }
+};
+
+// ---- INPUT MANAGER ----
+const Input = {
+  left: false, right: false, fire: false, firePressed: false, fireBuffered: false, up: false, shield: false,
+  _fireWasDown: false,
+  _keys: {},
+  reset() {
+    this.left = false; this.right = false; this.fire = false;
+    this.firePressed = false; this.fireBuffered = false; this.up = false;
+    this._fireWasDown = false; this._keys = {};
+  },
+  update() {
+    // Edge-trigger fire
+    const fireDown = this._keys['z'] || this._keys['Z'] || this._touchFire || false;
+    this.firePressed = fireDown && !this._fireWasDown;
+    if (this.firePressed) this.fireBuffered = true;
+    this.fire = fireDown;
+    this._fireWasDown = fireDown;
+    this.left = this._keys['ArrowLeft'] || this._touchLeft || false;
+    this.right = this._keys['ArrowRight'] || this._touchRight || false;
+    this.up = this._keys['ArrowUp'] || this._touchUp || false;
+    this.shield = this._keys['x'] || this._keys['X'] || this._touchShield || false;
+  },
+  consumeFireBuffer() { this.fireBuffered = false; },
+  _touchLeft: false, _touchRight: false, _touchFire: false, _touchUp: false, _touchShield: false
+};
+
+document.addEventListener('keydown', e => {
+  Input._keys[e.key] = true;
+  // Menu/system keys handled in game loop
+  if (['ArrowLeft','ArrowRight','ArrowUp','z','Z','x','X',' '].includes(e.key)) e.preventDefault();
+});
+document.addEventListener('keyup', e => { Input._keys[e.key] = false; });
+
+// Touch controls
+function setupTouch(id, prop) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('touchstart', e => { e.preventDefault(); Input[prop] = true; AudioMgr.init(); }, {passive:false});
+  el.addEventListener('touchend', e => { e.preventDefault(); Input[prop] = false; }, {passive:false});
+  el.addEventListener('mousedown', e => { Input[prop] = true; AudioMgr.init(); });
+  el.addEventListener('mouseup', e => { Input[prop] = false; });
+}
+setupTouch('btn-left', '_touchLeft');
+setupTouch('btn-right', '_touchRight');
+setupTouch('btn-fire', '_touchFire');
+setupTouch('btn-up', '_touchUp');
+setupTouch('btn-shield', '_touchShield');
+
+// ---- COLLISION ----
+function overlap(a, b) {
+  return a.x - a.w/2 < b.x + b.w/2 &&
+         a.x + a.w/2 > b.x - b.w/2 &&
+         a.y - a.h/2 < b.y + b.h/2 &&
+         a.y + a.h/2 > b.y - b.h/2;
+}
+
+// ---- PARTICLE SYSTEM ----
+function spawnExplosion(x, y, count, color) {
+  count = count || 10;
+  color = color || '#f80';
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.5 + Math.random() * 2;
+    const life = 30 + Math.random() * 30;
+    addParticle({ x, y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, life, maxLife: life, color, size: 2+Math.random()*3, type:'explosion', alpha:1 });
+  }
+}
+
+function spawnScoreText(x, y, text) {
+  addParticle({ x, y, vx:0, vy:-1, life:60, maxLife:60, color:'#fff', size:12, type:'score_text', text, alpha:1 });
+}
+
+function spawnDebris(x, y, count) {
+  for (let i = 0; i < (count||5); i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.3 + Math.random() * 1.5;
+    const life = 15 + Math.random() * 15;
+    addParticle({ x, y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, life, maxLife: life, color:'#888', size: 1+Math.random()*2, type:'debris', alpha:1 });
+  }
+}
+
+function spawnFlash(x, y, color) {
+  color = color || '#fff';
+  const life = 20;
+  addParticle({ x, y, vx:0, vy:0, life, maxLife: life, color, size: 30, type:'flash', alpha:1 });
+}
+
+function addParticle(p) {
+  if (G.particles.length >= MAX_PARTICLES) G.particles.shift();
+  G.particles.push(p);
+}
+
+function updateParticles(dt) {
+  for (let i = G.particles.length - 1; i >= 0; i--) {
+    const p = G.particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+    p.alpha = Math.max(0, p.life / p.maxLife);
+    if (p.life <= 0) G.particles.splice(i, 1);
+  }
+}
+
+function drawParticles(ctx) {
+  for (const p of G.particles) {
+    ctx.globalAlpha = p.alpha;
+    if (p.type === 'score_text') {
+      ctx.fillStyle = p.color;
+      ctx.font = p.size + 'px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.text, p.x, p.y);
+    } else if (p.type === 'flash') {
+      const radius = p.size * (1 - p.life / p.maxLife * 0.5);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---- FLIGHT PATTERNS (6 patterns) ----
+function triangleWave(t) { return 2 * Math.abs(2 * (t/(2*Math.PI) - Math.floor(t/(2*Math.PI) + 0.5))) - 1; }
+
+const FLIGHT_PATTERNS = [
+  // 1. Horizontal Sweep
+  (t, slot) => ({ x: slot.x + Math.sin(t * 0.02) * 150, y: slot.y }),
+  // 2. Figure-Eight
+  (t, slot) => ({ x: slot.x + Math.sin(t * 0.015) * 120, y: slot.y + Math.sin(t * 0.03) * 40 }),
+  // 3. Sine Wave (phase offset by row)
+  (t, slot) => ({ x: slot.x + Math.sin(t * 0.02 + slot.y * 0.1) * 100, y: slot.y }),
+  // 4. V-Formation Dive
+  (t, slot) => ({ x: slot.x, y: slot.y + Math.sin(t * 0.01) * 80 }),
+  // 5. Diamond Rotation
+  (t, slot) => {
+    const cx = CANVAS_W / 2, cy = 150;
+    const angle = Math.atan2(slot.y - cy, slot.x - cx);
+    const radius = Math.sqrt((slot.x-cx)**2 + (slot.y-cy)**2) * 0.6 + 40;
+    return { x: cx + Math.cos(t * 0.01 + angle) * radius, y: cy + Math.sin(t * 0.01 + angle) * radius };
+  },
+  // 6. Zigzag
+  (t, slot) => ({ x: slot.x + triangleWave(t * 0.03) * 130, y: slot.y })
+];
+
+// ---- BEZIER ENTRY PATHS ----
+function cubicBezier(p0, p1, p2, p3, t) {
+  const u = 1 - t;
+  return {
+    x: u*u*u*p0.x + 3*u*u*t*p1.x + 3*u*t*t*p2.x + t*t*t*p3.x,
+    y: u*u*u*p0.y + 3*u*u*t*p1.y + 3*u*t*t*p2.y + t*t*t*p3.y
+  };
+}
+
+function makeEntryPath(side, targetSlot) {
+  const swoopDepth = PLAYER_Y - 60 - BARRIER_H/2 - 40; // roughly dive height
+  if (side === 'left') {
+    return [
+      { x: -30, y: -30 },
+      { x: 80, y: swoopDepth },
+      { x: CANVAS_W * 0.6, y: swoopDepth - 60 },
+      { x: targetSlot.x, y: targetSlot.y }
+    ];
+  } else {
+    return [
+      { x: CANVAS_W + 30, y: -30 },
+      { x: CANVAS_W - 80, y: swoopDepth },
+      { x: CANVAS_W * 0.4, y: swoopDepth - 60 },
+      { x: targetSlot.x, y: targetSlot.y }
+    ];
+  }
+}
+
+// ---- BARRIER SYSTEM ----
+function createBarrier(cx, cy) {
+  const gridW = Math.floor(BARRIER_W / BARRIER_BLOCK_SIZE);
+  const gridH = Math.floor(BARRIER_H / BARRIER_BLOCK_SIZE);
+  const grid = [];
+  for (let r = 0; r < gridH; r++) {
+    grid[r] = [];
+    for (let c = 0; c < gridW; c++) grid[r][c] = true;
+  }
+  return { x: cx, y: cy, w: BARRIER_W, h: BARRIER_H, active: true, grid, gridW, gridH, blockSize: BARRIER_BLOCK_SIZE };
+}
+
+function erodeBarrier(barrier, hitX, hitY) {
+  const bx = barrier.x - barrier.w/2;
+  const by = barrier.y - barrier.h/2;
+  const col = Math.floor((hitX - bx) / barrier.blockSize);
+  const row = Math.floor((hitY - by) / barrier.blockSize);
+  let removed = false;
+  for (let dr = -BARRIER_EROSION_RADIUS; dr <= BARRIER_EROSION_RADIUS; dr++) {
+    for (let dc = -BARRIER_EROSION_RADIUS; dc <= BARRIER_EROSION_RADIUS; dc++) {
+      if (dr*dr + dc*dc <= BARRIER_EROSION_RADIUS * BARRIER_EROSION_RADIUS + 1) {
+        const r = row + dr, c = col + dc;
+        if (r >= 0 && r < barrier.gridH && c >= 0 && c < barrier.gridW && barrier.grid[r][c]) {
+          barrier.grid[r][c] = false;
+          removed = true;
+        }
+      }
+    }
+  }
+  // Check if fully destroyed
+  let anyTrue = false;
+  outer: for (let r = 0; r < barrier.gridH; r++) {
+    for (let c = 0; c < barrier.gridW; c++) {
+      if (barrier.grid[r][c]) { anyTrue = true; break outer; }
+    }
+  }
+  if (!anyTrue) barrier.active = false;
+  return removed;
+}
+
+function drawBarrier(ctx, b) {
+  if (!b.active) return;
+  const bx = b.x - b.w/2;
+  const by = b.y - b.h/2;
+  
+  // Use sprite as base image, then draw grid cells on top for damage visibility
+  if (sprites['campsite']) {
+    // Draw sprite clipped to remaining grid cells
+    ctx.save();
+    ctx.beginPath();
+    for (let r = 0; r < b.gridH; r++) {
+      for (let c = 0; c < b.gridW; c++) {
+        if (b.grid[r][c]) {
+          ctx.rect(bx + c * b.blockSize, by + r * b.blockSize, b.blockSize, b.blockSize);
+        }
+      }
+    }
+    ctx.clip();
+    ctx.drawImage(sprites['campsite'], bx, by, b.w, b.h);
+    ctx.restore();
+  } else {
+    // Fallback: colored grid cells
+    ctx.fillStyle = '#4a4';
+    for (let r = 0; r < b.gridH; r++) {
+      for (let c = 0; c < b.gridW; c++) {
+        if (b.grid[r][c]) {
+          ctx.fillRect(bx + c * b.blockSize, by + r * b.blockSize, b.blockSize, b.blockSize);
+        }
+      }
+    }
+  }
+}
+
+function createBarriers() {
+  const barriers = [];
+  const barrierY = PLAYER_Y - 60;
+  // Single campsite barrier on the far left
+  barriers.push(createBarrier(BARRIER_W / 2 + 30, barrierY));
+  return barriers;
+}
+
+// ---- GAME STATE ----
+const VALID_STATES = ['START_SCREEN', 'PLAYING_CAMPSITE', 'WAVE_TRANSITION', 'PLAYING_BOSS', 'SCREEN_TRANSITION', 'DEATH_PAUSE', 'GAME_OVER', 'PAUSED'];
+
+// State transition with guard checks
+function changeState(newState) {
+  if (!VALID_STATES.includes(newState)) return false;
+  G.state = newState;
+  return true;
+}
+
+// Check if a given key action is allowed in the current state
+function isKeyAllowed(key) {
+  switch (key) {
+    case 'pause':
+      return G.state === 'PLAYING_CAMPSITE' || G.state === 'PLAYING_BOSS' || G.state === 'PAUSED';
+    case 'restart':
+      return G.state !== 'START_SCREEN';
+    case 'quit':
+      return G.state !== 'START_SCREEN';
+    case 'start':
+      return G.state === 'START_SCREEN' || G.state === 'GAME_OVER';
+    default:
+      return false;
+  }
+}
+
+// Which systems are active in each state
+function isSystemActive(system) {
+  switch (system) {
+    case 'inputGameplay':
+      return G.state === 'PLAYING_CAMPSITE' || G.state === 'PLAYING_BOSS';
+    case 'inputMenu':
+      return G.state === 'START_SCREEN' || G.state === 'GAME_OVER' || G.state === 'PAUSED';
+    case 'waveSystem':
+      return G.state === 'PLAYING_CAMPSITE' || G.state === 'WAVE_TRANSITION';
+    case 'bossSystem':
+      return G.state === 'PLAYING_BOSS';
+    case 'collisionSystem':
+      return G.state === 'PLAYING_CAMPSITE' || G.state === 'PLAYING_BOSS';
+    case 'projectileSystem':
+      return G.state === 'PLAYING_CAMPSITE' || G.state === 'PLAYING_BOSS';
+    case 'campsiteSystem':
+      return G.state === 'PLAYING_CAMPSITE';
+    case 'bonusFlyoverSystem':
+      return G.state === 'PLAYING_CAMPSITE';
+    case 'particleSystem':
+      return G.state === 'PLAYING_CAMPSITE' || G.state === 'WAVE_TRANSITION' || G.state === 'PLAYING_BOSS' || G.state === 'SCREEN_TRANSITION' || G.state === 'DEATH_PAUSE';
+    case 'scoreSystem':
+      return G.state === 'PLAYING_CAMPSITE' || G.state === 'WAVE_TRANSITION' || G.state === 'PLAYING_BOSS';
+    case 'renderer':
+      return true; // Always active
+    default:
+      return false;
+  }
+}
+
+let G = {};
+
+function initGame() {
+  G = {
+    state: 'START_SCREEN',
+    previousPlayState: 'PLAYING_CAMPSITE',
+    score: 0,
+    level: 1,
+    lives: STARTING_LIVES,
+    wave: 0,
+    player: {
+      x: CANVAS_W / 2, y: PLAYER_Y, w: PLAYER_W, h: PLAYER_H,
+      vx: 0, vy: 0, active: true,
+      lives: STARTING_LIVES, invincible: false, invincibleTimer: 0,
+      carryingPiece: null, shotCooldown: 0, speed: PLAYER_SPEED,
+      flashVisible: true,
+      shieldActive: false, shieldEnergy: SHIELD_MAX_ENERGY
+    },
+    elderThings: [],
+    shoggoths: [],
+    playerProjectiles: [],
+    enemyProjectiles: [],
+    barriers: [],
+    campsitePieces: [],
+    campsite: { pieces: 0, required: BASE_CAMPSITE_PIECES, complete: false, sealSegments: [], placedExplosive: null, hintTimer: 0 },
+    bonusFlyover: null,
+    bonusDrop: null, // dropped bonus pickup from destroyed flyover
+    particles: [],
+    transitionTimer: 0,
+    transitionText: '',
+    deathTimer: 0,
+    waveTransitionTimer: 0,
+    bonusSpawnTimer: BONUS_FIRST_SPAWN_DELAY,
+    frameCount: 0,
+    debug: false,
+    paused: false,
+    debugInvincible: false,
+    wavePatternIndex: 0,
+    waveCycleBonus: 0,
+    waveSpawnQueue: [],
+    waveSpawnTimer: 0,
+    waveFrameCount: 0,
+    campsitePieceSpawnSide: 'left',
+    entrySubgroupSide: 'left',
+    instructionText: '',
+    instructionTimer: 0,
+    instructionBlink: true
+  };
+  updateHUD();
+}
+
+function updateHUD() {
+  hudScore.textContent = 'SCORE: ' + G.score;
+  hudLevel.textContent = 'LEVEL: ' + G.level;
+  hudLives.textContent = 'LIVES: ' + G.lives;
+}
+
+function flashHUDLives() {
+  hudLives.style.color = '#ff0';
+  hudLives.style.textShadow = '0 0 8px #ff0';
+  setTimeout(() => {
+    hudLives.style.color = '';
+    hudLives.style.textShadow = '';
+  }, 500);
+}
+
+function addScore(pts, x, y) {
+  const oldScore = G.score;
+  G.score += pts;
+  // Extra life check
+  const oldMult = Math.floor(oldScore / EXTRA_LIFE_INTERVAL);
+  const newMult = Math.floor(G.score / EXTRA_LIFE_INTERVAL);
+  if (newMult > oldMult) {
+    G.lives++;
+    G.player.lives = G.lives;
+    // Flash effect
+    spawnScoreText(CANVAS_W/2, CANVAS_H/2, '1UP!');
+    // Req 29.10: Flash the HUD lives counter
+    flashHUDLives();
+  }
+  if (x !== undefined && y !== undefined) {
+    spawnScoreText(x, y, '+' + pts);
+  }
+  updateHUD();
+}
+
+// ---- ELDER THING SPAWNING ----
+function assignFormationSlots(count) {
+  const slots = [];
+  const cols = Math.min(count, 8);
+  const rows = Math.ceil(count / cols);
+  // Center formation with generous margins for wide orbits
+  const marginX = 100; // keep slots away from edges
+  const usableW = CANVAS_W - marginX * 2;
+  const spacingX = cols > 1 ? usableW / (cols - 1) : 0;
+  const spacingY = 80;
+  const startX = cols > 1 ? marginX : CANVAS_W / 2;
+  const startY = 180;
+  for (let i = 0; i < count; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    slots.push({ x: startX + col * spacingX, y: startY + row * spacingY });
+  }
+  return slots;
+}
+
+function effectiveLevel() {
+  return G.level + G.waveCycleBonus;
+}
+
+function spawnWave() {
+  G.wave++;
+  G.waveFrameCount = 0;
+  G.bonusSpawnTimer = BONUS_FIRST_SPAWN_DELAY;
+  const patternFn = FLIGHT_PATTERNS[G.wavePatternIndex % FLIGHT_PATTERNS.length];
+  G.wavePatternIndex++;
+  // Bump difficulty each time we cycle through all 6 patterns (Req 28.4)
+  if (G.wavePatternIndex > 0 && G.wavePatternIndex % FLIGHT_PATTERNS.length === 0) {
+    G.waveCycleBonus++;
+  }
+  const lvl = effectiveLevel();
+  const count = Math.min(enemyCount(lvl) + (G.wave - 1), MAX_ELDER_THINGS); // +1 per wave, capped at 16
+  const slots = assignFormationSlots(count);
+  
+  // Create spawn queue — one elder thing at a time, alternating sides
+  G.waveSpawnQueue = [];
+  let side = G.entrySubgroupSide;
+  for (let i = 0; i < count; i++) {
+    G.waveSpawnQueue.push({ slot: slots[i], side, patternFn });
+    side = side === 'left' ? 'right' : 'left';
+  }
+  G.entrySubgroupSide = side;
+  G.waveSpawnTimer = 0;
+  AudioMgr.playSFX('sfx_wave_start');
+}
+
+function processWaveSpawnQueue(dt) {
+  if (G.waveSpawnQueue.length === 0) return;
+  G.waveSpawnTimer -= dt;
+  if (G.waveSpawnTimer <= 0) {
+    const info = G.waveSpawnQueue.shift();
+    spawnElderThing(info.slot, info.side, info.patternFn);
+    G.waveSpawnTimer = 60; // ~1 second between each spawn
+  }
+}
+
+function spawnElderThing(slot, side, patternFn) {
+  const path = makeEntryPath(side, slot);
+  const lvl = effectiveLevel();
+  const et = {
+    x: path[0].x, y: path[0].y, w: ELDER_THING_W, h: ELDER_THING_H,
+    vx: 0, vy: 0, active: true,
+    state: 'entering',
+    entryPath: path,
+    entryProgress: 0,
+    formationSlot: slot,
+    patternFn: patternFn,
+    patternTime: 0,
+    fireTimer: 30 + Math.random() * 60,
+    fireInterval: enemyFireInterval(lvl),
+    diveTarget: null,
+    swoopPath: null, swoopProgress: 0,
+    points: ELDER_THING_POINTS,
+    prevX: path[0].x, prevY: path[0].y,
+    animFrame: 0, animTimer: 0,
+    hoverPhaseX: Math.random() * Math.PI * 2,
+    hoverPhaseY: Math.random() * Math.PI * 2,
+    hoverSpeedX: 0.008 + Math.random() * 0.004,
+    hoverSpeedY: 0.016 + Math.random() * 0.008,
+    hoverRadiusX: 70 + Math.random() * 30,
+    hoverRadiusY: 40 + Math.random() * 20
+  };
+  G.elderThings.push(et);
+}
+
+// ---- ELDER THING UPDATE ----
+function updateElderThings(dt) {
+  const lvl = effectiveLevel();
+  const spd = enemySpeed(lvl) * ELDER_THING_BASE_SPEED;
+  const divProb = diveFrequency(lvl);
+  
+  for (const et of G.elderThings) {
+    if (!et.active) continue;
+    
+    // Track previous position for facing direction
+    et.prevX = et.x;
+    et.prevY = et.y;
+    
+    // Animation
+    et.animTimer += dt;
+    if (et.animTimer >= ELDER_THING_ANIM_INTERVAL) {
+      et.animTimer = 0;
+      et.animFrame = 1 - et.animFrame;
+    }
+    
+    if (et.state === 'entering') {
+      et.entryProgress += 0.015 * dt;
+      if (et.entryProgress >= 1) {
+        et.entryProgress = 1;
+        et.state = 'formation';
+        et.x = et.formationSlot.x;
+        et.y = et.formationSlot.y;
+      } else {
+        const p = cubicBezier(et.entryPath[0], et.entryPath[1], et.entryPath[2], et.entryPath[3], et.entryProgress);
+        et.x = p.x;
+        et.y = p.y;
+      }
+    } else if (et.state === 'formation') {
+      et.patternTime += dt;
+      const rawPos = et.patternFn(et.patternTime, et.formationSlot);
+      // Clamp base pattern position to safe area first
+      const margin = et.w / 2 + 10;
+      const pos = {
+        x: Math.max(margin + 10, Math.min(CANVAS_W - margin - 10, rawPos.x)),
+        y: Math.max(margin + 10, Math.min(CANVAS_H * 0.5 - 10, rawPos.y))
+      };
+      // Individual figure-8 hover around the pattern position
+      et.hoverPhaseX += et.hoverSpeedX * dt;
+      et.hoverPhaseY += et.hoverSpeedY * dt;
+      // Scale hover radius so orbits fit within canvas bounds
+      const spaceLeft = pos.x - margin;
+      const spaceRight = CANVAS_W - margin - pos.x;
+      const spaceTop = pos.y - margin;
+      const spaceBottom = CANVAS_H * 0.5 - pos.y;
+      const radX = Math.min(et.hoverRadiusX, spaceLeft, spaceRight);
+      const radY = Math.min(et.hoverRadiusY, spaceTop, spaceBottom);
+      const hoverX = Math.sin(et.hoverPhaseX) * Math.max(radX, 8);
+      const hoverY = Math.sin(et.hoverPhaseY) * Math.max(radY, 8);
+      et.x = pos.x + hoverX;
+      et.y = pos.y + hoverY;
+      
+      // Random dive — set up a bezier swoop path
+      if (Math.random() < divProb * dt) {
+        et.state = 'swooping';
+        const bottomY = PLAYER_Y - 30; // swoop just above the player
+        const targetX = G.player.x;
+        // Use current movement direction to create a smooth tangent exit
+        const velX = et.x - et.prevX;
+        const velY = et.y - et.prevY;
+        const tangentScale = 80; // how far ahead the tangent control point extends
+        const cp1x = et.x + velX * tangentScale;
+        const cp1y = et.y + velY * tangentScale;
+        // Swoop: tangent exit → arc down to bottom → sweep back up to formation
+        et.swoopPath = [
+          { x: et.x, y: et.y },
+          { x: cp1x, y: Math.max(cp1y, et.y + 40) },
+          { x: targetX + (et.formationSlot.x - targetX) * 0.2, y: bottomY + 20 },
+          { x: et.formationSlot.x, y: et.formationSlot.y }
+        ];
+        et.swoopProgress = 0;
+      }
+    } else if (et.state === 'swooping') {
+      et.swoopProgress += 0.006 * spd * dt;
+      if (et.swoopProgress >= 1) {
+        et.swoopProgress = 1;
+        et.state = 'formation';
+        et.x = et.formationSlot.x;
+        et.y = et.formationSlot.y;
+        et.patternTime = 0;
+        // Reset hover phases so orbit starts cleanly from slot position
+        et.hoverPhaseX = 0;
+        et.hoverPhaseY = 0;
+      } else {
+        const p = cubicBezier(et.swoopPath[0], et.swoopPath[1], et.swoopPath[2], et.swoopPath[3], et.swoopProgress);
+        et.x = p.x;
+        et.y = p.y;
+      }
+    }
+    
+    // Fire
+    et.fireTimer -= dt;
+    if (et.fireTimer <= 0 && G.enemyProjectiles.length < MAX_ENEMY_PROJECTILES) {
+      et.fireTimer = et.fireInterval + Math.random() * 30;
+      const lvlProj = effectiveLevel();
+      G.enemyProjectiles.push({
+        x: et.x, y: et.y + et.h/2, w: 4, h: 10,
+        vx: 0, vy: enemyProjectileSpeed(lvlProj),
+        active: true, owner: 'enemy', type: 'straight',
+        spiralPhase: 0, spiralAmplitude: 0, speed: enemyProjectileSpeed(lvlProj)
+      });
+      AudioMgr.playSFX('sfx_elder_fire');
+    }
+  }
+}
+
+function drawElderThing(ctx, et) {
+  if (!et.active) return;
+  
+  // Compute and smooth facing angle from movement delta
+  const dx = et.x - et.prevX;
+  const dy = et.y - et.prevY;
+  if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
+    const targetAngle = Math.atan2(dy, dx);
+    if (et.facingAngle === undefined) {
+      et.facingAngle = targetAngle;
+    } else {
+      // Smooth rotation (lerp with wrapping)
+      let diff = targetAngle - et.facingAngle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      et.facingAngle += diff * 0.25;
+    }
+  }
+  const angle = et.facingAngle !== undefined ? et.facingAngle : Math.PI / 2;
+  
+  // Draw with rotation applied
+  ctx.save();
+  ctx.translate(et.x, et.y);
+  ctx.rotate(angle - Math.PI / 2); // offset so 0 = facing up (sprite drawn upright)
+  
+  // Try sprite (2-frame animation)
+  const spriteKey = 'elder_thing_' + (et.animFrame + 1);
+  if (sprites[spriteKey]) {
+    ctx.drawImage(sprites[spriteKey], -et.w/2, -et.h/2, et.w, et.h);
+    ctx.restore();
+    return;
+  }
+  
+  // Fallback: rectangular body
+  
+  const hw = et.w / 2, hh = et.h / 2;
+  
+  // Body
+  ctx.fillStyle = '#a0f';
+  ctx.fillRect(-hw, -hh, et.w, et.h);
+  
+  // "Front" indicator (top edge = front when angle=0)
+  ctx.fillStyle = '#d0f';
+  ctx.fillRect(-hw, -hh, et.w, 5);
+  
+  // Eyes near front
+  ctx.fillStyle = '#ff0';
+  ctx.fillRect(-6, -hh + 6, 4, 4);
+  ctx.fillRect(2, -hh + 6, 4, 4);
+  
+  // Wing animation (frame-dependent)
+  ctx.fillStyle = '#80c';
+  if (et.animFrame === 0) {
+    // Wings out
+    ctx.fillRect(-hw - 4, -2, 4, 8);
+    ctx.fillRect(hw, -2, 4, 8);
+  } else {
+    // Wings tucked
+    ctx.fillRect(-hw - 2, 0, 2, 6);
+    ctx.fillRect(hw, 0, 2, 6);
+  }
+  
+  // "Back" tail detail
+  ctx.fillStyle = '#708';
+  ctx.fillRect(-3, hh - 4, 6, 4);
+  
+  ctx.restore();
+}
+
+// ---- SHOGGOTH SYSTEM ----
+function spawnShoggoth(size, x, y, baseSpd) {
+  const dims = size === 'full' ? [SHOGGOTH_FULL_W, SHOGGOTH_FULL_H] :
+               size === 'half' ? [SHOGGOTH_HALF_W, SHOGGOTH_HALF_H] :
+               [SHOGGOTH_QUARTER_W, SHOGGOTH_QUARTER_H];
+  const speedMult = size === 'full' ? 1.0 : size === 'half' ? 1.25 : 1.5;
+  const points = size === 'full' ? 200 : size === 'half' ? 300 : 500;
+  const angle = Math.random() * Math.PI * 2;
+  const spd = baseSpd * speedMult;
+  
+  const s = {
+    x: Math.max(dims[0]/2, Math.min(CANVAS_W - dims[0]/2, x)),
+    y: Math.max(dims[1]/2, Math.min(CANVAS_H - dims[1]/2, y)),
+    w: dims[0], h: dims[1],
+    vx: Math.cos(angle) * spd + (Math.random()-0.5)*0.5,
+    vy: Math.sin(angle) * spd + (Math.random()-0.5)*0.5,
+    active: true,
+    size: size,
+    baseSpeed: baseSpd,
+    animFrame: 0,
+    animTimer: 0,
+    invincible: size !== 'full',
+    invincibleTimer: size !== 'full' ? SHOGGOTH_SPLIT_INVINCIBILITY : 0,
+    flashVisible: true,
+    patternTime: Math.random() * 100,
+    fireTimer: 20 + Math.random() * 20,
+    fireInterval: 30,
+    points: points,
+    spawnZoom: size === 'full' ? 1.0 : 0, // full-size shoggoths zoom in
+    spawnZoomTimer: size === 'full' ? 60 : 0 // ~1 second zoom-in
+  };
+  // Full-size shoggoths start invincible during zoom-in
+  if (size === 'full') {
+    s.invincible = true;
+    s.invincibleTimer = 60;
+  }
+  G.shoggoths.push(s);
+}
+
+function updateShoggoths(dt) {
+  for (const s of G.shoggoths) {
+    if (!s.active) continue;
+    
+    // Zoom-in spawn animation
+    if (s.spawnZoomTimer > 0) {
+      s.spawnZoomTimer -= dt;
+      s.spawnZoom = Math.max(0, s.spawnZoomTimer / 60);
+      if (s.spawnZoomTimer <= 0) s.spawnZoom = 0;
+      continue; // don't move or fire while zooming in
+    }
+    
+    // Invincibility timer
+    if (s.invincible) {
+      s.invincibleTimer -= dt;
+      s.flashVisible = Math.floor(s.invincibleTimer / 3) % 2 === 0;
+      if (s.invincibleTimer <= 0) {
+        s.invincible = false;
+        s.flashVisible = true;
+      }
+    }
+    
+    // Animation
+    s.animTimer += dt;
+    if (s.animTimer >= SHOGGOTH_ANIM_INTERVAL) {
+      s.animTimer = 0;
+      s.animFrame = 1 - s.animFrame;
+    }
+    
+    // Movement - bounce pattern
+    s.patternTime += dt;
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    
+    // Bounce off walls
+    if (s.x - s.w/2 < 0) { s.x = s.w/2; s.vx = Math.abs(s.vx); }
+    if (s.x + s.w/2 > CANVAS_W) { s.x = CANVAS_W - s.w/2; s.vx = -Math.abs(s.vx); }
+    if (s.y - s.h/2 < 30) { s.y = 30 + s.h/2; s.vy = Math.abs(s.vy); }
+    if (s.y + s.h/2 > CANVAS_H - 100) { s.y = CANVAS_H - 100 - s.h/2; s.vy = -Math.abs(s.vy); }
+    
+    // Fire spiral projectiles — intensity doubles with each split
+    if (!s.invincible) {
+      s.fireTimer -= dt;
+      const fireRateMult = s.size === 'full' ? 1 : s.size === 'half' ? 2 : 4;
+      const projSpeed = enemyProjectileSpeed(G.level) * 0.8;
+      if (s.fireTimer <= 0 && G.enemyProjectiles.length < MAX_ENEMY_PROJECTILES) {
+        s.fireTimer = (s.fireInterval + Math.random() * 40) / fireRateMult;
+        // Aim toward player
+        const dx = G.player.x - s.x;
+        const dy = G.player.y - s.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        G.enemyProjectiles.push({
+          x: s.x, y: s.y + s.h/2, w: 20, h: 20,
+          vx: (dx / dist) * projSpeed * 0.1,
+          vy: (dy / dist) * projSpeed * 0.6,
+          active: true, owner: 'enemy', type: 'spiral',
+          spiralPhase: Math.random() * Math.PI * 2,
+          spiralAmplitude: SPIRAL_AMPLITUDE,
+          speed: projSpeed
+        });
+      }
+    }
+  }
+}
+
+function hitShoggoth(s) {
+  if (s.invincible) return false;
+  s.active = false;
+  addScore(s.points, s.x, s.y);
+  
+  if (s.size === 'full') {
+    spawnExplosion(s.x, s.y, 12, '#f0a');
+    AudioMgr.playSFX('sfx_shoggoth_split', 0.25);
+    spawnShoggoth('half', s.x - s.w/2, s.y, s.baseSpeed);
+    spawnShoggoth('half', s.x + s.w/2, s.y, s.baseSpeed);
+  } else if (s.size === 'half') {
+    spawnExplosion(s.x, s.y, 12, '#f0a');
+    AudioMgr.playSFX('sfx_shoggoth_split', 0.25);
+    spawnShoggoth('quarter', s.x - s.w/3, s.y, s.baseSpeed);
+    spawnShoggoth('quarter', s.x + s.w/3, s.y, s.baseSpeed);
+  } else {
+    // Req 29.3: larger particle explosion for quarter-sized destruction
+    spawnExplosion(s.x, s.y, 20, '#f0a');
+    AudioMgr.playSFX('sfx_shoggoth_destroy', 0.25);
+  }
+  return true;
+}
+
+function drawShoggoth(ctx, s) {
+  if (!s.active) return;
+  if (s.invincible && !s.flashVisible && s.spawnZoomTimer <= 0) return;
+  
+  // Zoom-in scale: 1.0 = just started (tiny), 0 = fully zoomed in
+  const zoomScale = s.spawnZoom > 0 ? (1 - s.spawnZoom) * (1 - s.spawnZoom) : 1; // ease-out
+  
+  // Pulsating scale effect — breathe in/out
+  const pulse = 1 + Math.sin(s.patternTime * 0.08) * 0.06;
+  const pulseW = s.w * pulse * zoomScale;
+  const pulseH = s.h * (2 - pulse) * zoomScale;
+  
+  // Wavy distortion via slight skew
+  const skew = Math.sin(s.patternTime * 0.12) * 0.05;
+  
+  // Spin during zoom-in or split invincibility
+  const zoomSpin = s.spawnZoom > 0 ? s.spawnZoom * Math.PI * 4 : 0;
+  const splitSpin = (s.size !== 'full' && s.invincible && s.invincibleTimer > 0)
+    ? (s.invincibleTimer / SHOGGOTH_SPLIT_INVINCIBILITY) * Math.PI * 3 : 0;
+  
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  if (zoomSpin) ctx.rotate(zoomSpin);
+  if (splitSpin) ctx.rotate(splitSpin);
+  ctx.transform(1, skew, -skew, 1, 0, 0); // subtle shear
+  
+  const spriteKey = 'shoggoth_' + s.size + '_' + (s.animFrame + 1);
+  if (sprites[spriteKey]) {
+    ctx.drawImage(sprites[spriteKey], -pulseW/2, -pulseH/2, pulseW, pulseH);
+  } else {
+    // Fallback colored rectangles
+    const colors = { full: '#f00', half: '#f60', quarter: '#fa0' };
+    ctx.fillStyle = colors[s.size] || '#f00';
+    ctx.fillRect(-pulseW/2, -pulseH/2, pulseW, pulseH);
+    // Blob detail
+    ctx.fillStyle = '#000';
+    const eyeSize = pulseW * 0.12;
+    ctx.beginPath();
+    ctx.arc(-pulseW*0.2, -pulseH*0.1, eyeSize, 0, Math.PI*2);
+    ctx.arc(pulseW*0.2, -pulseH*0.1, eyeSize, 0, Math.PI*2);
+    ctx.fill();
+  }
+  
+  ctx.restore();
+}
+
+// ---- CAVE SEAL & EXPLOSIVE SYSTEM ----
+function initSealSegments(count) {
+  // Create a 2-column × 3-row grid of boulders — all start intact
+  // 'count' determines how many must be destroyed to open the cave
+  const segments = [];
+  const baseX = SEAL_X - (SEAL_COLS - 1) * SEAL_BOULDER_W / 2;
+  for (let r = 0; r < SEAL_ROWS; r++) {
+    for (let c = 0; c < SEAL_COLS; c++) {
+      segments.push({
+        intact: true,
+        x: baseX + c * SEAL_BOULDER_W,
+        y: SEAL_Y - (SEAL_ROWS - 1 - r) * SEAL_BOULDER_H,
+        w: SEAL_BOULDER_W,
+        h: SEAL_BOULDER_H
+      });
+    }
+  }
+  return segments;
+}
+
+function spawnCampsitePiece() {
+  // Count intact boulders and pending explosives (placed + carried + on ground)
+  const intactBoulders = G.campsite.sealSegments.filter(s => s.intact).length;
+  const pendingExplosives = (G.campsite.placedExplosive && !G.campsite.placedExplosive.exploded ? 1 : 0)
+    + (G.player.carryingPiece ? 1 : 0)
+    + G.campsitePieces.filter(p => p.active).length;
+  // No more explosives needed
+  if (intactBoulders <= pendingExplosives) return;
+  if (G.campsitePieces.some(p => p.active && !p.pickedUp)) return;
+  if (G.player.carryingPiece) return;
+  
+  G.campsitePieces.push({
+    x: BARRIER_W / 2 + 30, y: PLAYER_Y - 10, w: EXPLOSIVE_W, h: EXPLOSIVE_H,
+    vx: 0, vy: 0, active: true,
+    spawned: true, pickedUp: false, spawnSide: 'left'
+  });
+}
+
+function updateCampsite(dt) {
+  // Check pickup
+  if (!G.player.carryingPiece) {
+    for (const piece of G.campsitePieces) {
+      if (!piece.active || piece.pickedUp) continue;
+      if (overlap(G.player, piece)) {
+        piece.pickedUp = true;
+        piece.active = false;
+        G.player.carryingPiece = piece;
+        AudioMgr.playSFX('sfx_piece_pickup');
+      }
+    }
+  }
+  
+  // Check placement — right side near the sealed cave
+  if (G.player.carryingPiece && G.player.x > CANVAS_W - 70) {
+    G.player.carryingPiece = null;
+    AudioMgr.playSFX('sfx_piece_place');
+    // Place explosive at the base of the seal
+    G.campsite.placedExplosive = {
+      x: SEAL_X, y: SEAL_Y,
+      countdown: EXPLOSIVE_COUNTDOWN,
+      exploded: false
+    };
+  }
+  
+  // Update placed explosive countdown
+  if (G.campsite.placedExplosive && !G.campsite.placedExplosive.exploded) {
+    const exp = G.campsite.placedExplosive;
+    exp.countdown -= dt;
+    if (exp.countdown <= 0) {
+      exp.exploded = true;
+      // Big explosion
+      spawnExplosion(exp.x, exp.y, 25, '#f80');
+      spawnExplosion(exp.x, exp.y - 15, 15, '#ff0');
+      spawnFlash(exp.x, exp.y, '#fff');
+      AudioMgr.playSFX('sfx_seal_explosion', 0.25);
+      
+      // Destroy next seal segment (top-to-bottom, left-to-right)
+      for (const seg of G.campsite.sealSegments) {
+        if (seg.intact) {
+          seg.intact = false;
+          spawnDebris(seg.x, seg.y, 8);
+          break;
+        }
+      }
+      G.campsite.pieces++;
+      
+      // Check if player is in blast radius
+      const pdx = G.player.x - exp.x;
+      const pdy = G.player.y - exp.y;
+      const dist = Math.sqrt(pdx * pdx + pdy * pdy);
+      if (dist < EXPLOSIVE_BLAST_RADIUS && !G.player.invincible && !G.debugInvincible) {
+        playerDeath();
+      }
+      
+      // Check completion — cave opens when no intact boulders remain
+      if (!G.campsite.sealSegments.some(s => s.intact)) {
+        G.campsite.complete = true;
+        G.instructionText = 'Push Up to Enter the Cave';
+        G.instructionTimer = 300;
+        G.instructionBlink = false;
+      }
+      
+      updateHUD();
+      
+      // Clear after a short delay (let particles play)
+      setTimeout(() => { G.campsite.placedExplosive = null; }, 500);
+    }
+  }
+}
+
+function drawCampsiteStructure(ctx) {
+  // Draw the sealed cave entrance on the right
+  const segs = G.campsite.sealSegments;
+  
+  // Draw boulders (intact ones)
+  for (let i = 0; i < segs.length; i++) {
+    const seg = segs[i];
+    if (!seg.intact) continue;
+    
+    // Try sprite first
+    if (sprites['seal_boulder']) {
+      ctx.drawImage(sprites['seal_boulder'], seg.x - seg.w/2, seg.y - seg.h/2, seg.w, seg.h);
+      continue;
+    }
+    
+    // Fallback: colored boulder with cracks
+    const colors = ['#8a7a6a', '#7a6a5a', '#9a8a7a', '#6a5a4a', '#8a7060', '#7a6050'];
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(seg.x - seg.w/2, seg.y - seg.h/2, seg.w, seg.h);
+    // Crack details
+    ctx.strokeStyle = '#4a3a2a';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(seg.x - seg.w/4, seg.y - seg.h/2);
+    ctx.lineTo(seg.x - seg.w/6, seg.y + seg.h/2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(seg.x + seg.w/5, seg.y - seg.h/4);
+    ctx.lineTo(seg.x + seg.w/3, seg.y + seg.h/3);
+    ctx.stroke();
+  }
+  
+  // Draw placed explosive with countdown
+  if (G.campsite.placedExplosive && !G.campsite.placedExplosive.exploded) {
+    const exp = G.campsite.placedExplosive;
+    // Explosive body
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(exp.x - 10, exp.y - 8, 20, 16);
+    // Fuse spark
+    const spark = Math.floor(exp.countdown / 5) % 2;
+    ctx.fillStyle = spark ? '#ff0' : '#f80';
+    ctx.beginPath();
+    ctx.arc(exp.x, exp.y - 10, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // Countdown number
+    const secondsLeft = Math.ceil(exp.countdown / 60);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(secondsLeft.toString(), exp.x, exp.y - 18);
+  }
+}
+
+function drawCampsitePieces(ctx) {
+  // Draw unplaced explosives
+  for (const piece of G.campsitePieces) {
+    if (!piece.active || piece.pickedUp) continue;
+    // Explosive crate
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(piece.x - piece.w/2, piece.y - piece.h/2, piece.w, piece.h);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('TNT', piece.x, piece.y + 4);
+  }
+}
+
+function drawCampsiteOverlay(ctx) {
+  if (G.state === 'PLAYING_CAMPSITE' || G.state === 'WAVE_TRANSITION') {
+    ctx.fillStyle = '#fff';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'center';
+    if (G.campsite.complete) {
+      ctx.fillStyle = '#fff';
+      ctx.fillText('CAVE OPEN — PRESS UP TO ENTER THE ICE CAVE', CANVAS_W/2, 20);
+    } else {
+      const destroyed = G.campsite.sealSegments.filter(s => !s.intact).length;
+      const total = G.campsite.sealSegments.length;
+      ctx.fillText('SEAL: ' + destroyed + '/' + total, CANVAS_W/2, 20);
+      // Hint when player tries to enter before seal is destroyed
+      if (G.campsite.hintTimer > 0) {
+        ctx.fillStyle = '#fff';
+        ctx.font = '11px monospace';
+        ctx.fillText('DESTROY ALL SEAL SEGMENTS TO OPEN THE CAVE', CANVAS_W/2, 38);
+      }
+    }
+    
+    // Blinking instruction text (center of screen)
+    if (G.instructionTimer > 0) {
+      const show = G.instructionBlink ? (Math.floor(Date.now() / 500) % 2) : 1;
+      if (show) {
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px monospace';
+        ctx.textAlign = 'center';
+        const lines = G.instructionText.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          ctx.fillText(lines[i], CANVAS_W/2, CANVAS_H/2 + i * 20);
+        }
+      }
+    }
+  }
+}
+
+// ---- BONUS FLYOVER ----
+function updateBonusFlyover(dt) {
+  if (G.state !== 'PLAYING_CAMPSITE') return;
+  
+  G.waveFrameCount += dt;
+  
+  if (!G.bonusFlyover) {
+    G.bonusSpawnTimer -= dt;
+    const activeElders = G.elderThings.filter(e => e.active).length;
+    if (G.bonusSpawnTimer <= 0 && activeElders >= BONUS_MIN_ENEMIES) {
+      const dir = Math.random() < 0.5 ? 'left' : 'right';
+      const startX = dir === 'left' ? -20 : CANVAS_W + 20;
+      G.bonusFlyover = {
+        x: startX, y: 40, w: 40, h: 40,
+        vx: dir === 'left' ? BONUS_FLYOVER_SPEED : -BONUS_FLYOVER_SPEED,
+        vy: 0, active: true,
+        direction: dir, points: BONUS_FLYOVER_POINTS
+      };
+      AudioMgr.playSFX('sfx_bonus_appear');
+    }
+  } else {
+    const bf = G.bonusFlyover;
+    bf.x += bf.vx * dt;
+    // Off screen?
+    if (bf.x < -40 || bf.x > CANVAS_W + 40) {
+      G.bonusFlyover = null;
+      G.bonusSpawnTimer = BONUS_RESPAWN_MIN + Math.random() * (BONUS_RESPAWN_MAX - BONUS_RESPAWN_MIN);
+    }
+  }
+}
+
+function drawBonusFlyover(ctx) {
+  if (!G.bonusFlyover) return;
+  const bf = G.bonusFlyover;
+  
+  // Pulsing yellow glow
+  const glowPulse = 0.2 + Math.sin(Date.now() * 0.008) * 0.15;
+  ctx.save();
+  ctx.globalAlpha = glowPulse;
+  ctx.shadowColor = '#ff0';
+  ctx.shadowBlur = 20 + Math.sin(Date.now() * 0.006) * 10;
+  ctx.fillStyle = '#ff0';
+  ctx.beginPath();
+  ctx.ellipse(bf.x, bf.y, bf.w/2 + 4, bf.h/2 + 4, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+  
+  // Sprite or fallback
+  if (!drawSprite(ctx, 'bonus_flyover', bf.x, bf.y, bf.w, bf.h)) {
+    ctx.fillStyle = '#f0f';
+    ctx.beginPath();
+    ctx.ellipse(bf.x, bf.y, bf.w/2, bf.h/2, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.ellipse(bf.x, bf.y - 2, bf.w/4, bf.h/4, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+// ---- BONUS DROP ----
+function updateBonusDrop(dt) {
+  if (!G.bonusDrop) return;
+  const bd = G.bonusDrop;
+  if (!bd.grounded) {
+    bd.y += bd.vy * dt;
+    if (bd.y >= PLAYER_Y - 10) {
+      bd.y = PLAYER_Y - 10;
+      bd.grounded = true;
+    }
+  } else {
+    bd.timer -= dt;
+    if (bd.timer <= 0) {
+      G.bonusDrop = null;
+      return;
+    }
+  }
+  // Check player pickup
+  const p = G.player;
+  if (Math.abs(p.x - bd.x) < (p.w/2 + bd.w/2) && Math.abs(p.y - bd.y) < (p.h/2 + bd.h/2)) {
+    addScore(bd.points, bd.x, bd.y);
+    G.bonusDrop = null;
+  }
+}
+
+function drawBonusDrop(ctx) {
+  if (!G.bonusDrop) return;
+  const bd = G.bonusDrop;
+  ctx.save();
+  ctx.globalAlpha = bd.grounded ? Math.min(1, bd.timer / 60) : 1;
+  if (!drawSprite(ctx, 'bonus_drop', bd.x, bd.y, bd.w, bd.h)) {
+    ctx.fillStyle = '#ff0';
+    ctx.fillRect(bd.x - bd.w/2, bd.y - bd.h/2, bd.w, bd.h);
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('1000', bd.x, bd.y + 3);
+  }
+  ctx.restore();
+}
+
+// ---- PLAYER UPDATE ----
+function updatePlayer(dt) {
+  const p = G.player;
+  
+  // Movement
+  if (Input.left) p.x -= p.speed * dt;
+  if (Input.right) p.x += p.speed * dt;
+  p.x = Math.max(p.w/2, Math.min(CANVAS_W - p.w/2, p.x));
+  
+  // Invincibility
+  if (p.invincible) {
+    p.invincibleTimer -= dt;
+    p.flashVisible = Math.floor(p.invincibleTimer / 4) % 2 === 0;
+    if (p.invincibleTimer <= 0) {
+      p.invincible = false;
+      p.flashVisible = true;
+    }
+  }
+  
+  // Shield
+  if (Input.shield && p.shieldEnergy >= SHIELD_MIN_ACTIVATE && !p.shieldActive) {
+    p.shieldActive = true;
+  }
+  if (p.shieldActive) {
+    p.shieldEnergy -= SHIELD_DRAIN_RATE * dt;
+    if (p.shieldEnergy <= 0 || !Input.shield) {
+      p.shieldEnergy = Math.max(0, p.shieldEnergy);
+      p.shieldActive = false;
+    }
+  } else {
+    p.shieldEnergy = Math.min(SHIELD_MAX_ENERGY, p.shieldEnergy + SHIELD_RECHARGE_RATE * dt);
+  }
+  
+  // Shot cooldown
+  if (p.shotCooldown > 0) p.shotCooldown -= dt;
+  
+  // Fire
+  if ((Input.firePressed || Input.fireBuffered) && p.shotCooldown <= 0 && G.playerProjectiles.length < PLAYER_MAX_PROJECTILES) {
+    G.playerProjectiles.push({
+      x: p.x, y: p.y - p.h/2, w: 4, h: 12,
+      vx: 0, vy: -PROJECTILE_PLAYER_SPEED,
+      active: true, owner: 'player', type: 'straight',
+      spiralPhase: 0, spiralAmplitude: 0, speed: PROJECTILE_PLAYER_SPEED
+    });
+    p.shotCooldown = PLAYER_SHOT_COOLDOWN;
+    Input.consumeFireBuffer();
+    AudioMgr.playSFX('sfx_player_fire', 0.25);
+  } else if (Input.firePressed && (p.shotCooldown > 0 || G.playerProjectiles.length >= PLAYER_MAX_PROJECTILES)) {
+    Input.fireBuffered = true;
+  }
+}
+
+function drawPlayer(ctx) {
+  const p = G.player;
+  if (G.state === 'DEATH_PAUSE') return; // Player not visible during death pause
+  if (p.invincible && !p.flashVisible) return;
+  
+  if (!drawSprite(ctx, 'player', p.x, p.y, p.w, p.h)) {
+    // Fallback: ship shape
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y - p.h/2);
+    ctx.lineTo(p.x - p.w/2, p.y + p.h/2);
+    ctx.lineTo(p.x + p.w/2, p.y + p.h/2);
+    ctx.closePath();
+    ctx.fill();
+    // Cockpit
+    ctx.fillStyle = '#a01e00';
+    ctx.fillRect(p.x - 4, p.y - 2, 8, 10);
+  }
+  
+  // Draw carried explosive indicator
+  if (p.carryingPiece) {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(p.x - 8, p.y - p.h/2 - 12, 16, 10);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 7px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('TNT', p.x, p.y - p.h/2 - 4);
+  }
+  
+  // Draw shield
+  if (p.shieldActive) {
+    const shieldAlpha = Math.max(0.2, p.shieldEnergy / SHIELD_MAX_ENERGY);
+    ctx.globalAlpha = shieldAlpha * 0.6;
+    ctx.strokeStyle = '#4af';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.w * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = shieldAlpha * 0.15;
+    ctx.fillStyle = '#4af';
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  
+  // Draw shield energy meter (small bar below player)
+  if (!p.shieldActive || true) {
+    const meterW = 30;
+    const meterH = 3;
+    const meterX = p.x - meterW / 2;
+    const meterY = p.y + p.h / 2 + 4;
+    const fill = p.shieldEnergy / SHIELD_MAX_ENERGY;
+    ctx.fillStyle = '#222';
+    ctx.fillRect(meterX, meterY, meterW, meterH);
+    ctx.fillStyle = fill > 0.3 ? '#4af' : '#f44';
+    ctx.fillRect(meterX, meterY, meterW * fill, meterH);
+  }
+}
+
+// ---- PROJECTILE UPDATE & DRAW ----
+function updateProjectiles(dt) {
+  for (const p of G.playerProjectiles) {
+    if (!p.active) continue;
+    p.y += p.vy * dt;
+    if (p.y + p.h/2 < 0) p.active = false;
+  }
+  for (const p of G.enemyProjectiles) {
+    if (!p.active) continue;
+    p.y += p.vy * dt;
+    if (p.type === 'spiral') {
+      p.spiralPhase += SPIRAL_SPEED * dt;
+      p.x += Math.sin(p.spiralPhase) * p.spiralAmplitude * dt;
+    }
+    if (p.y - p.h/2 > CANVAS_H) p.active = false;
+  }
+}
+
+function drawProjectiles(ctx) {
+  // Player projectiles
+  for (const p of G.playerProjectiles) {
+    if (!p.active) continue;
+    if (!drawSprite(ctx, 'projectile_player', p.x, p.y, p.w, p.h)) {
+      ctx.fillStyle = '#0ff';
+      ctx.fillRect(p.x - p.w/2, p.y - p.h/2, p.w, p.h);
+    }
+  }
+  // Enemy projectiles
+  for (const p of G.enemyProjectiles) {
+    if (!p.active) continue;
+    if (p.type === 'spiral') {
+      // Spinning spiral projectile
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.spiralPhase * 3);
+      if (sprites['projectile_spiral']) {
+        ctx.drawImage(sprites['projectile_spiral'], -p.w/2, -p.h/2, p.w, p.h);
+      } else {
+        ctx.fillStyle = '#f0f';
+        ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+        ctx.fillStyle = '#d0a';
+        ctx.fillRect(-p.w/4, -p.h/4, p.w/2, p.h/2);
+      }
+      ctx.restore();
+    } else if (!drawSprite(ctx, 'projectile_enemy', p.x, p.y, p.w, p.h)) {
+      ctx.fillStyle = '#f44';
+      ctx.fillRect(p.x - p.w/2, p.y - p.h/2, p.w, p.h);
+    }
+  }
+}
+
+// ---- COLLISION SYSTEM ----
+function runCollisions() {
+  const p = G.player;
+  
+  // Player projectiles vs Elder Things
+  for (const proj of G.playerProjectiles) {
+    if (!proj.active) continue;
+    for (const et of G.elderThings) {
+      if (!et.active) continue;
+      if (overlap(proj, et)) {
+        proj.active = false;
+        et.active = false;
+        addScore(et.points, et.x, et.y);
+        spawnExplosion(et.x, et.y, 10, '#a0f');
+        AudioMgr.playSFX('sfx_elder_destroy');
+        // Spawn campsite piece
+        spawnCampsitePiece();
+        break;
+      }
+    }
+  }
+  
+  // Player projectiles vs Shoggoths
+  for (const proj of G.playerProjectiles) {
+    if (!proj.active) continue;
+    for (const s of G.shoggoths) {
+      if (!s.active || s.invincible) continue;
+      if (overlap(proj, s)) {
+        proj.active = false;
+        hitShoggoth(s);
+        break;
+      }
+    }
+  }
+  
+  // Player projectiles vs Bonus Flyover
+  if (G.bonusFlyover) {
+    for (const proj of G.playerProjectiles) {
+      if (!proj.active) continue;
+      if (overlap(proj, G.bonusFlyover)) {
+        proj.active = false;
+        spawnExplosion(G.bonusFlyover.x, G.bonusFlyover.y, 15, '#f0f');
+        AudioMgr.playSFX('sfx_bonus_hit');
+        // Spawn a bonus drop that falls to the ground
+        G.bonusDrop = {
+          x: G.bonusFlyover.x, y: G.bonusFlyover.y,
+          w: 40, h: 40,
+          vy: 2, // fall speed
+          points: G.bonusFlyover.points,
+          timer: 300, // ~5 seconds on the ground before disappearing
+          grounded: false
+        };
+        G.bonusFlyover = null;
+        G.bonusSpawnTimer = BONUS_RESPAWN_MIN + Math.random() * (BONUS_RESPAWN_MAX - BONUS_RESPAWN_MIN);
+        break;
+      }
+    }
+  }
+  
+  // Player projectiles vs Barriers
+  for (const proj of G.playerProjectiles) {
+    if (!proj.active) continue;
+    for (const b of G.barriers) {
+      if (!b.active) continue;
+      if (overlap(proj, b)) {
+        if (erodeBarrier(b, proj.x, proj.y)) {
+          spawnDebris(proj.x, proj.y, 3);
+          AudioMgr.playSFX('sfx_barrier_hit');
+        }
+        proj.active = false;
+        break;
+      }
+    }
+  }
+  
+  // Enemy projectiles vs Player
+  if (!p.invincible && !G.debugInvincible && !p.shieldActive) {
+    for (const proj of G.enemyProjectiles) {
+      if (!proj.active) continue;
+      if (overlap(proj, p)) {
+        proj.active = false;
+        playerDeath();
+        return;
+      }
+    }
+  } else if (p.shieldActive) {
+    // Shield absorbs projectiles
+    for (const proj of G.enemyProjectiles) {
+      if (!proj.active) continue;
+      if (overlap(proj, p)) {
+        proj.active = false;
+        spawnFlash(proj.x, proj.y, '#4af');
+      }
+    }
+  }
+  
+  // Enemy projectiles vs Barriers
+  for (const proj of G.enemyProjectiles) {
+    if (!proj.active) continue;
+    for (const b of G.barriers) {
+      if (!b.active) continue;
+      if (overlap(proj, b)) {
+        if (erodeBarrier(b, proj.x, proj.y)) {
+          spawnDebris(proj.x, proj.y, 3);
+          AudioMgr.playSFX('sfx_barrier_hit');
+        }
+        proj.active = false;
+        break;
+      }
+    }
+  }
+  
+  // Enemies vs Player (direct collision)
+  if (!p.invincible && !G.debugInvincible && !p.shieldActive) {
+    for (const et of G.elderThings) {
+      if (!et.active) continue;
+      if (overlap(et, p)) {
+        et.active = false;
+        playerDeath();
+        return;
+      }
+    }
+    for (const s of G.shoggoths) {
+      if (!s.active) continue;
+      if (overlap(s, p)) {
+        playerDeath();
+        return;
+      }
+    }
+  }
+}
+
+// ---- PLAYER DEATH & RESPAWN ----
+function playerDeath() {
+  G.lives--;
+  G.player.lives = G.lives;
+  spawnExplosion(G.player.x, G.player.y, 15, '#ff0');
+  AudioMgr.playSFX('sfx_player_hit', 0.25);
+  
+  // Return carried piece
+  if (G.player.carryingPiece) {
+    const piece = G.player.carryingPiece;
+    piece.active = true;
+    piece.pickedUp = false;
+    G.player.carryingPiece = null;
+    // Re-add to pieces array if not there
+    if (!G.campsitePieces.includes(piece)) {
+      G.campsitePieces.push(piece);
+    }
+  }
+  
+  G.previousPlayState = G.state === 'PLAYING_BOSS' ? 'PLAYING_BOSS' : 'PLAYING_CAMPSITE';
+  G.state = 'DEATH_PAUSE';
+  G.deathTimer = DEATH_PAUSE_DURATION;
+  updateHUD();
+}
+
+function respawnPlayer() {
+  G.player.x = CANVAS_W / 2;
+  G.player.y = PLAYER_Y;
+  G.player.invincible = true;
+  G.player.invincibleTimer = INVINCIBILITY_DURATION;
+  G.player.flashVisible = true;
+  G.player.shotCooldown = 0;
+  G.player.carryingPiece = null;
+  G.player.shieldActive = false;
+  G.player.shieldEnergy = SHIELD_MAX_ENERGY;
+}
+
+// ---- SCREEN TRANSITIONS ----
+function startIceCaveTransition() {
+  G.state = 'SCREEN_TRANSITION';
+  G.transitionText = 'ENTERING THE ICE CAVE...';
+  G.transitionTimer = TRANSITION_DURATION;
+  AudioMgr.playSFX('sfx_transition');
+  AudioMgr.stopMusic();
+}
+
+function startCampsiteTransition() {
+  G.level++;
+  G.state = 'SCREEN_TRANSITION';
+  G.transitionText = 'RETURNING TO THE CAMPSITE — LEVEL ' + G.level;
+  G.transitionTimer = TRANSITION_DURATION;
+  AudioMgr.playSFX('sfx_transition');
+  AudioMgr.stopMusic();
+  updateHUD();
+}
+
+function enterIceCave() {
+  G.state = 'PLAYING_BOSS';
+  G.previousPlayState = 'PLAYING_BOSS';
+  G.elderThings = [];
+  G.enemyProjectiles = [];
+  G.playerProjectiles = [];
+  G.campsitePieces = [];
+  G.bonusFlyover = null;
+  G.barriers = [];
+  G.player.carryingPiece = null;
+  
+  // Spawn full shoggoth
+  const baseSpd = shoggothBaseSpeed(G.level);
+  spawnShoggoth('full', CANVAS_W/2, 150, baseSpd);
+  
+  AudioMgr.playMusic('icecave');
+  AudioMgr.playSFX('sfx_boss_start');
+  respawnPlayer();
+}
+
+function enterCampsite() {
+  G.state = 'PLAYING_CAMPSITE';
+  G.previousPlayState = 'PLAYING_CAMPSITE';
+  G.wave = 0;
+  G.wavePatternIndex = (G.level - 1) % FLIGHT_PATTERNS.length;
+  G.waveCycleBonus = 0;
+  G.elderThings = [];
+  G.shoggoths = [];
+  G.enemyProjectiles = [];
+  G.playerProjectiles = [];
+  G.campsitePieces = [];
+  G.bonusFlyover = null;
+  const req = campsitePiecesRequired(G.level);
+  G.campsite = { pieces: 0, required: req, complete: false, sealSegments: initSealSegments(req), placedExplosive: null };
+  G.barriers = createBarriers();
+  
+  spawnWave();
+  AudioMgr.playMusic('campsite');
+  respawnPlayer();
+  G.instructionText = 'Destroy the Cyclopean Stones\nto Enter the Cave';
+  G.instructionTimer = 300; // ~5 seconds at 60fps
+  G.instructionBlink = false;
+}
+
+// ---- CLEANUP ----
+function isOffScreen(e) {
+  return e.x + e.w/2 < 0 || e.x - e.w/2 > CANVAS_W || e.y + e.h/2 < 0 || e.y - e.h/2 > CANVAS_H;
+}
+
+function cleanupEntities() {
+  // Mark off-screen entities as inactive BEFORE filtering
+  for (const p of G.playerProjectiles) {
+    if (isOffScreen(p)) p.active = false;
+  }
+  for (const p of G.enemyProjectiles) {
+    if (isOffScreen(p)) p.active = false;
+  }
+  for (const e of G.elderThings) {
+    // Don't remove elder things that are entering (they start off-screen)
+    if (e.active && e.state !== 'entering' && isOffScreen(e)) e.active = false;
+  }
+  for (const s of G.shoggoths) {
+    if (s.active && isOffScreen(s)) s.active = false;
+  }
+  // Remove off-screen particles
+  G.particles = G.particles.filter(p => {
+    if (p.life <= 0) return false;
+    const hw = (p.size || 1) / 2;
+    return !(p.x + hw < 0 || p.x - hw > CANVAS_W || p.y + hw < 0 || p.y - hw > CANVAS_H);
+  });
+  // Remove off-screen bonus flyover
+  if (G.bonusFlyover && isOffScreen(G.bonusFlyover)) {
+    G.bonusFlyover = null;
+    G.bonusSpawnTimer = BONUS_RESPAWN_MIN + Math.random() * (BONUS_RESPAWN_MAX - BONUS_RESPAWN_MIN);
+  }
+
+  // Filter inactive entities
+  G.playerProjectiles = G.playerProjectiles.filter(p => p.active);
+  G.enemyProjectiles = G.enemyProjectiles.filter(p => p.active);
+  G.elderThings = G.elderThings.filter(e => e.active);
+  G.shoggoths = G.shoggoths.filter(s => s.active);
+  G.campsitePieces = G.campsitePieces.filter(p => p.active);
+  G.barriers = G.barriers.filter(b => b.active);
+}
+
+// ---- RENDER ----
+function render() {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  
+  // Background
+  if (G.state === 'PLAYING_BOSS' || (G.state === 'SCREEN_TRANSITION' && G.previousPlayState === 'PLAYING_BOSS') ||
+      (G.state === 'DEATH_PAUSE' && G.previousPlayState === 'PLAYING_BOSS') ||
+      (G.state === 'PAUSED' && G.previousPlayState === 'PLAYING_BOSS')) {
+    if (!drawSprite(ctx, 'bg_icecave', CANVAS_W/2, CANVAS_H/2, CANVAS_W, CANVAS_H)) {
+      // Ice cave fallback
+      const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
+      grad.addColorStop(0, '#1a2a4a');
+      grad.addColorStop(1, '#0a1020');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+      // Ice crystals
+      ctx.fillStyle = 'rgba(100,180,255,0.1)';
+      for (let i = 0; i < 20; i++) {
+        const ix = (i * 73 + 17) % CANVAS_W;
+        const iy = (i * 47 + 31) % CANVAS_H;
+        ctx.fillRect(ix, iy, 3, 8);
+      }
+    }
+  } else if (G.state === 'START_SCREEN' || G.state === 'GAME_OVER') {
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  } else {
+    if (!drawSprite(ctx, 'bg_campsite', CANVAS_W/2, CANVAS_H/2, CANVAS_W, CANVAS_H)) {
+      // Campsite fallback
+      const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
+      grad.addColorStop(0, '#0a0a2a');
+      grad.addColorStop(0.6, '#1a1a3a');
+      grad.addColorStop(1, '#2a2a4a');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+      // Stars
+      ctx.fillStyle = '#fff';
+      for (let i = 0; i < 30; i++) {
+        const sx = (i * 67 + 13) % CANVAS_W;
+        const sy = (i * 43 + 7) % (CANVAS_H * 0.4);
+        ctx.fillRect(sx, sy, 1, 1);
+      }
+      // Mountains
+      ctx.fillStyle = '#1a1a3a';
+      ctx.beginPath();
+      ctx.moveTo(0, 200);
+      ctx.lineTo(80, 120); ctx.lineTo(160, 180); ctx.lineTo(240, 100);
+      ctx.lineTo(320, 160); ctx.lineTo(400, 110); ctx.lineTo(480, 170);
+      ctx.lineTo(480, 200); ctx.closePath();
+      ctx.fill();
+    }
+  }
+  
+  // State-specific rendering
+  if (G.state === 'START_SCREEN') {
+    renderStartScreen();
+    return;
+  }
+  if (G.state === 'GAME_OVER') {
+    renderGameOver();
+    return;
+  }
+  if (G.state === 'SCREEN_TRANSITION') {
+    renderTransition();
+    return;
+  }
+  
+  // Game entities
+  // Layer 2: Barriers
+  for (const b of G.barriers) drawBarrier(ctx, b);
+  
+  // Layer 3: Campsite structure — only on campsite screen
+  const onBossScreen = G.state === 'PLAYING_BOSS' || G.previousPlayState === 'PLAYING_BOSS';
+  if (!onBossScreen) {
+    drawCampsiteStructure(ctx);
+  }
+  
+  // Layer 4: Campsite piece (unplaced, on ground)
+  if (!onBossScreen) {
+    drawCampsitePieces(ctx);
+  }
+  
+  // Layer 5: Enemies (Elder Things / Shoggoths)
+  for (const et of G.elderThings) drawElderThing(ctx, et);
+  for (const s of G.shoggoths) drawShoggoth(ctx, s);
+  
+  // Layer 6: Bonus flyover
+  drawBonusFlyover(ctx);
+  drawBonusDrop(ctx);
+  
+  // Layer 7: Player (with carried piece if applicable)
+  drawPlayer(ctx);
+  
+  // Layer 8: Projectiles (player and enemy)
+  drawProjectiles(ctx);
+  
+  // Layer 9: Particles / Effects
+  drawParticles(ctx);
+  
+  // Layer 10: Overlays (transitions, pause, campsite-complete message, debug info)
+  drawCampsiteOverlay(ctx);
+  
+  if (G.state === 'PAUSED') {
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    ctx.fillStyle = '#fff';
+    ctx.font = '36px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('PAUSED', CANVAS_W/2, CANVAS_H/2);
+    ctx.font = '14px monospace';
+    ctx.fillText('Press P to resume', CANVAS_W/2, CANVAS_H/2 + 40);
+  }
+  
+  if (G.state === 'DEATH_PAUSE') {
+    // Just show particles/explosion, entities frozen
+  }
+  
+  // Debug overlay
+  if (G.debug) renderDebug();
+}
+
+// ---- SCREEN RENDERERS ----
+function renderStartScreen() {
+  // Box art
+  if (sprites['box_art']) {
+    drawSprite(ctx, 'box_art', CANVAS_W/2, CANVAS_H/2, CANVAS_W, CANVAS_H);
+  }
+  
+  ctx.textAlign = 'center';
+  
+  // Subtitle
+  ctx.fillStyle = '#fff';
+  ctx.font = '14px monospace';
+  ctx.fillText('Mountains Of Madness', CANVAS_W/2, 282);
+  ctx.fillText('Lovecraft Arcade Volume 1', CANVAS_W/2, 300);
+  
+  // Instructions
+  ctx.fillStyle = '#fff';
+  ctx.font = '12px monospace';
+  const instructions = [
+    '← → : Move',
+    'Z : Fire',
+    '↑ : Enter Ice Cave',
+    'P : Pause',
+    'R : Restart  Q : Quit'
+  ];
+  for (let i = 0; i < instructions.length; i++) {
+    ctx.fillText(instructions[i], CANVAS_W/2, 350 + i * 22);
+  }
+  
+  // Start prompt
+  ctx.fillStyle = '#fff';
+  ctx.font = '16px monospace';
+  const blink = Math.floor(Date.now() / 500) % 2;
+  if (blink) ctx.fillText('Click or tap to start', CANVAS_W/2, 510);
+  
+  // Mountain silhouette decoration (hidden when box art is loaded)
+  if (!sprites['box_art']) {
+    ctx.fillStyle = '#1a1a3a';
+    ctx.beginPath();
+    ctx.moveTo(0, CANVAS_H);
+    ctx.lineTo(0, 520); ctx.lineTo(60, 480); ctx.lineTo(120, 510);
+    ctx.lineTo(200, 460); ctx.lineTo(280, 500); ctx.lineTo(360, 470);
+    ctx.lineTo(420, 490); ctx.lineTo(480, 460); ctx.lineTo(480, CANVAS_H);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function renderGameOver() {
+  // Background image or fallback
+  if (!drawSprite(ctx, 'bg_gameover', CANVAS_W/2, CANVAS_H/2, CANVAS_W, CANVAS_H)) {
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  }
+  
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#f00';
+  ctx.font = 'bold 36px monospace';
+  ctx.fillText('GAME OVER', CANVAS_W/2, 220);
+  
+  ctx.fillStyle = '#fff';
+  ctx.font = '18px monospace';
+  ctx.fillText('FINAL SCORE: ' + G.score, CANVAS_W/2, 280);
+  ctx.fillText('LEVEL: ' + G.level, CANVAS_W/2, 310);
+  
+  ctx.fillStyle = '#fff';
+  ctx.font = '14px monospace';
+  ctx.fillText('Press R or click to restart', CANVAS_W/2, 380);
+  ctx.fillText('Press Q for title screen', CANVAS_W/2, 410);
+}
+
+function renderTransition() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillStyle = '#fff';
+  ctx.font = '16px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(G.transitionText, CANVAS_W/2, CANVAS_H/2);
+  
+  // Loading dots animation
+  const dots = '.'.repeat(Math.floor(G.frameCount / 20) % 4);
+  ctx.fillText(dots, CANVAS_W/2, CANVAS_H/2 + 30);
+}
+
+function renderDebug() {
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(0, 0, 200, 140);
+  ctx.fillStyle = '#fff';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'left';
+  const lines = [
+    'STATE: ' + G.state,
+    'FPS: ' + Math.round(1000 / Math.max(1, lastFrameTime)),
+    'Level: ' + G.level + ' Wave: ' + G.wave,
+    'Elders: ' + G.elderThings.filter(e=>e.active).length,
+    'Shoggoths: ' + G.shoggoths.filter(s=>s.active).length,
+    'P.Proj: ' + G.playerProjectiles.length + ' E.Proj: ' + G.enemyProjectiles.length,
+    'Particles: ' + G.particles.length,
+    'Barriers: ' + G.barriers.filter(b=>b.active).length,
+    'Seal: ' + G.campsite.pieces + '/' + G.campsite.required,
+    'Invincible: ' + (G.player.invincible || G.debugInvincible),
+    'Frame: ' + G.frameCount
+  ];
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], 4, 12 + i * 12);
+  }
+  
+  // Draw hitboxes
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  // Player
+  ctx.strokeRect(G.player.x - G.player.w/2, G.player.y - G.player.h/2, G.player.w, G.player.h);
+  // Elder things
+  for (const et of G.elderThings) {
+    if (!et.active) continue;
+    ctx.strokeStyle = '#f0f';
+    ctx.strokeRect(et.x - et.w/2, et.y - et.h/2, et.w, et.h);
+  }
+  // Shoggoths
+  for (const s of G.shoggoths) {
+    if (!s.active) continue;
+    ctx.strokeStyle = '#f00';
+    ctx.strokeRect(s.x - s.w/2, s.y - s.h/2, s.w, s.h);
+  }
+  // Projectiles
+  ctx.strokeStyle = '#ff0';
+  for (const p of [...G.playerProjectiles, ...G.enemyProjectiles]) {
+    if (!p.active) continue;
+    ctx.strokeRect(p.x - p.w/2, p.y - p.h/2, p.w, p.h);
+  }
+  // Barriers
+  for (const b of G.barriers) {
+    if (!b.active) continue;
+    ctx.strokeStyle = '#0ff';
+    ctx.strokeRect(b.x - b.w/2, b.y - b.h/2, b.w, b.h);
+  }
+  // Campsite pieces
+  ctx.strokeStyle = '#fa0';
+  for (const cp of G.campsitePieces) {
+    if (!cp.active) continue;
+    ctx.strokeRect(cp.x - cp.w/2, cp.y - cp.h/2, cp.w, cp.h);
+  }
+  // Bonus flyover
+  if (G.bonusFlyover && G.bonusFlyover.active) {
+    ctx.strokeStyle = '#f0f';
+    ctx.strokeRect(G.bonusFlyover.x - G.bonusFlyover.w/2, G.bonusFlyover.y - G.bonusFlyover.h/2, G.bonusFlyover.w, G.bonusFlyover.h);
+  }
+}
+
+// ---- MAIN GAME LOOP ----
+let lastTime = 0;
+let lastFrameTime = 16.667;
+
+function gameLoop(timestamp) {
+  requestAnimationFrame(gameLoop);
+  
+  if (lastTime === 0) { lastTime = timestamp; return; }
+  const elapsed = timestamp - lastTime;
+  lastTime = timestamp;
+  lastFrameTime = elapsed;
+  const dt = Math.min(elapsed / 16.667, 3.0);
+  
+  // Process input
+  Input.update();
+  
+  // Handle system keys (state-independent)
+  handleSystemKeys();
+  
+  // State machine update
+  switch (G.state) {
+    case 'START_SCREEN':
+      // Wait for click/tap/space
+      break;
+      
+    case 'PLAYING_CAMPSITE':
+      updatePlayer(dt);
+      processWaveSpawnQueue(dt);
+      updateElderThings(dt);
+      updateProjectiles(dt);
+      updateCampsite(dt);
+      updateBonusFlyover(dt);
+      updateBonusDrop(dt);
+      runCollisions();
+      cleanupEntities();
+      updateParticles(dt);
+      
+      // Check wave complete
+      if (G.elderThings.length === 0 && G.waveSpawnQueue.length === 0) {
+        G.state = 'WAVE_TRANSITION';
+        G.waveTransitionTimer = 180; // 3 seconds for wave pause
+        // Clear all projectiles and bonus flyover between waves
+        G.playerProjectiles = [];
+        G.enemyProjectiles = [];
+        G.bonusFlyover = null;
+        // Show next wave number (no blink)
+        G.instructionText = 'Wave ' + (G.wave + 1);
+        G.instructionTimer = 180;
+        G.instructionBlink = false;
+      }
+      
+      // Check ice cave entry
+      if (Input.up) {
+        if (G.campsite.complete) {
+          startIceCaveTransition();
+        } else {
+          G.campsite.hintTimer = 180; // show hint for 3 seconds
+        }
+      }
+      if (G.campsite.hintTimer > 0) G.campsite.hintTimer -= dt;
+      if (G.instructionTimer > 0) G.instructionTimer -= dt;
+      break;
+      
+    case 'WAVE_TRANSITION':
+      G.waveTransitionTimer -= dt;
+      if (G.instructionTimer > 0) G.instructionTimer -= dt;
+      // Player can still move, fire, gather & place explosives during wave pause
+      updatePlayer(dt);
+      updateCampsite(dt);
+      updateProjectiles(dt);
+      updateBonusDrop(dt);
+      updateParticles(dt);
+      if (G.waveTransitionTimer <= 0) {
+        G.state = 'PLAYING_CAMPSITE';
+        spawnWave();
+        // Show stone destruction instructions on first wave
+        if (G.wave === 1) {
+          G.instructionText = 'Destroy the Cyclopean Stones\nto Enter the Cave';
+          G.instructionTimer = 300;
+          G.instructionBlink = false;
+        }
+      }
+      break;
+      
+    case 'PLAYING_BOSS':
+      updatePlayer(dt);
+      updateShoggoths(dt);
+      updateProjectiles(dt);
+      runCollisions();
+      cleanupEntities();
+      updateParticles(dt);
+      
+      // Check all shoggoths dead
+      if (G.shoggoths.length === 0) {
+        startCampsiteTransition();
+      }
+      break;
+      
+    case 'SCREEN_TRANSITION':
+      G.transitionTimer -= dt;
+      updateParticles(dt);
+      if (G.transitionTimer <= 0) {
+        if (G.transitionText.includes('ICE CAVE')) {
+          enterIceCave();
+        } else {
+          enterCampsite();
+        }
+      }
+      break;
+      
+    case 'DEATH_PAUSE':
+      G.deathTimer -= dt;
+      updateParticles(dt);
+      // Keep enemies moving during death pause
+      if (G.previousPlayState === 'PLAYING_CAMPSITE') {
+        processWaveSpawnQueue(dt);
+        updateElderThings(dt);
+        updateBonusFlyover(dt);
+      } else if (G.previousPlayState === 'PLAYING_BOSS') {
+        updateShoggoths(dt);
+      }
+      updateProjectiles(dt);
+      if (G.deathTimer <= 0) {
+        if (G.lives <= 0) {
+          G.state = 'GAME_OVER';
+          AudioMgr.playSFX('sfx_game_over', 0.5);
+          AudioMgr.stopMusic();
+        } else {
+          G.state = G.previousPlayState;
+          respawnPlayer();
+        }
+      }
+      break;
+      
+    case 'GAME_OVER':
+      break;
+      
+    case 'PAUSED':
+      break;
+  }
+  
+  // Render
+  render();
+  
+  // Advance frame counter (end of frame)
+  G.frameCount++;
+}
+
+// ---- SYSTEM KEY HANDLING ----
+function handleSystemKeys() {
+  // P - Pause (only in playing states)
+  if (Input._keys['p'] || Input._keys['P']) {
+    Input._keys['p'] = false;
+    Input._keys['P'] = false;
+    if (G.state === 'PLAYING_CAMPSITE' || G.state === 'PLAYING_BOSS') {
+      G.previousPlayState = G.state;
+      G.state = 'PAUSED';
+      AudioMgr.pauseMusic();
+    } else if (G.state === 'PAUSED') {
+      G.state = G.previousPlayState;
+      AudioMgr.resumeMusic();
+    }
+  }
+  
+  // R - Restart (not from START_SCREEN)
+  if (Input._keys['r'] || Input._keys['R']) {
+    Input._keys['r'] = false;
+    Input._keys['R'] = false;
+    if (isKeyAllowed('restart')) {
+      AudioMgr.stopMusic();
+      initGame();
+      G.state = 'WAVE_TRANSITION';
+      G.previousPlayState = 'PLAYING_CAMPSITE';
+      G.barriers = createBarriers();
+      const rReq = campsitePiecesRequired(G.level);
+      G.campsite.required = rReq;
+      G.campsite.sealSegments = initSealSegments(rReq);
+      G.waveTransitionTimer = 180;
+      AudioMgr.init();
+      AudioMgr.playSFX('sfx_game_start', 0.5);
+      AudioMgr.playMusic('campsite');
+      respawnPlayer();
+      G.instructionText = 'Wave 1';
+      G.instructionTimer = 180;
+      G.instructionBlink = false;
+    }
+  }
+  
+  // Q - Quit to title (not from START_SCREEN)
+  if (Input._keys['q'] || Input._keys['Q']) {
+    Input._keys['q'] = false;
+    Input._keys['Q'] = false;
+    if (isKeyAllowed('quit')) {
+      AudioMgr.stopMusic();
+      initGame();
+    }
+  }
+  
+  // Debug toggle
+  if (Input._keys['`']) {
+    Input._keys['`'] = false;
+    G.debug = !G.debug;
+  }
+  
+  // Debug commands
+  if (G.debug) {
+    if (Input._keys['n'] || Input._keys['N']) {
+      Input._keys['n'] = false; Input._keys['N'] = false;
+      // Skip level
+      if (G.state === 'PLAYING_CAMPSITE') {
+        startIceCaveTransition();
+      } else if (G.state === 'PLAYING_BOSS') {
+        startCampsiteTransition();
+      }
+    }
+    if (Input._keys['s'] || Input._keys['S']) {
+      Input._keys['s'] = false; Input._keys['S'] = false;
+      spawnShoggoth('full', CANVAS_W/2, 150, shoggothBaseSpeed(G.level));
+    }
+    if (Input._keys['e'] || Input._keys['E']) {
+      Input._keys['e'] = false; Input._keys['E'] = false;
+      const slot = { x: 100 + Math.random() * 280, y: 80 + Math.random() * 80 };
+      spawnElderThing(slot, 'left', FLIGHT_PATTERNS[0]);
+    }
+    if (Input._keys['i'] || Input._keys['I']) {
+      Input._keys['i'] = false; Input._keys['I'] = false;
+      G.debugInvincible = !G.debugInvincible;
+    }
+  }
+}
+
+// ---- START GAME CLICK/TAP HANDLER ----
+function handleStartClick() {
+  if (isKeyAllowed('start') && G.state === 'START_SCREEN') {
+    AudioMgr.init();
+    initGame();
+    G.state = 'WAVE_TRANSITION';
+    G.previousPlayState = 'PLAYING_CAMPSITE';
+    G.barriers = createBarriers();
+    const sReq1 = campsitePiecesRequired(G.level);
+    G.campsite.required = sReq1;
+    G.campsite.sealSegments = initSealSegments(sReq1);
+    G.waveTransitionTimer = 180;
+    AudioMgr.playSFX('sfx_game_start', 0.5);
+    AudioMgr.playMusic('campsite');
+    respawnPlayer();
+    G.instructionText = 'Wave 1';
+    G.instructionTimer = 180;
+    G.instructionBlink = false;
+  } else if (isKeyAllowed('start') && G.state === 'GAME_OVER') {
+    initGame();
+    G.state = 'WAVE_TRANSITION';
+    G.previousPlayState = 'PLAYING_CAMPSITE';
+    G.barriers = createBarriers();
+    const sReq2 = campsitePiecesRequired(G.level);
+    G.campsite.required = sReq2;
+    G.campsite.sealSegments = initSealSegments(sReq2);
+    G.waveTransitionTimer = 180;
+    AudioMgr.playSFX('sfx_game_start', 0.5);
+    AudioMgr.playMusic('campsite');
+    respawnPlayer();
+    G.instructionText = 'Wave 1';
+    G.instructionTimer = 180;
+    G.instructionBlink = false;
+  }
+}
+
+canvas.addEventListener('click', handleStartClick);
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  handleStartClick();
+  AudioMgr.init();
+}, {passive: false});
+
+// Space to start
+document.addEventListener('keydown', e => {
+  if (e.key === ' ') {
+    e.preventDefault();
+    handleStartClick();
+    AudioMgr.init();
+  }
+});
+
+// ---- INIT & BOOT ----
+loadSprites();
+initGame();
+
+// Attempt to load audio (will fail gracefully without assets)
+AudioMgr.loadAll().catch(() => {});
+
+// Start game loop
+requestAnimationFrame(gameLoop);
+
+// ---- TEST MODE EXPORTS ----
+if (typeof window !== 'undefined' && window.__TEST_MODE__) {
+  window.GameInternals = {
+    // Constants
+    CANVAS_W, CANVAS_H, PLAYER_Y, PLAYER_SPEED, PLAYER_W, PLAYER_H,
+    PLAYER_MAX_PROJECTILES, PLAYER_SHOT_COOLDOWN, INVINCIBILITY_DURATION,
+    DEATH_PAUSE_DURATION, TRANSITION_DURATION, WAVE_TRANSITION_DURATION,
+    ELDER_THING_W, ELDER_THING_H, ELDER_THING_POINTS, ELDER_THING_BASE_SPEED,
+    SHOGGOTH_FULL_W, SHOGGOTH_FULL_H, SHOGGOTH_HALF_W, SHOGGOTH_HALF_H,
+    SHOGGOTH_QUARTER_W, SHOGGOTH_QUARTER_H, SHOGGOTH_SPLIT_INVINCIBILITY,
+    PROJECTILE_PLAYER_SPEED, PROJECTILE_ENEMY_BASE_SPEED, MAX_ENEMY_PROJECTILES,
+    SPIRAL_AMPLITUDE, SPIRAL_SPEED, BARRIER_COUNT, BARRIER_W, BARRIER_H,
+    BARRIER_BLOCK_SIZE, BARRIER_EROSION_RADIUS, BONUS_FLYOVER_SPEED,
+    BONUS_FLYOVER_POINTS, BONUS_FIRST_SPAWN_DELAY, BONUS_RESPAWN_MIN,
+    BONUS_RESPAWN_MAX, BONUS_MIN_ENEMIES, MAX_PARTICLES, EXTRA_LIFE_INTERVAL,
+    STARTING_LIVES, BASE_CAMPSITE_PIECES, MAX_CAMPSITE_PIECES, MAX_ELDER_THINGS,
+    VALID_STATES,
+    // Functions
+    overlap, enemyCount, campsitePiecesRequired, enemyFireInterval,
+    enemySpeed, enemyProjectileSpeed, diveFrequency, shoggothBaseSpeed,
+    effectiveLevel,
+    createBarrier, erodeBarrier, createBarriers, initGame, addScore,
+    spawnExplosion, spawnScoreText, spawnDebris, spawnFlash, flashHUDLives, spawnShoggoth,
+    addParticle, updateParticles, drawParticles,
+    spawnCampsitePiece, updateCampsite, drawCampsiteStructure, drawCampsitePieces, drawCampsiteOverlay,
+    playerDeath, respawnPlayer, updatePlayer,
+    spawnWave, spawnElderThing, assignFormationSlots, processWaveSpawnQueue,
+    updateElderThings, FLIGHT_PATTERNS, cubicBezier, makeEntryPath,
+    changeState, isKeyAllowed, isSystemActive,
+    handleSystemKeys, handleStartClick,
+    enterCampsite, enterIceCave, startIceCaveTransition, startCampsiteTransition,
+    updateBonusFlyover, runCollisions, cleanupEntities, isOffScreen,
+    updateShoggoths, hitShoggoth, updateProjectiles,
+    // State
+    getState: () => G,
+    setState: (s) => { G = s; },
+    Input,
+    AudioMgr
+  };
+}
+</script>
+</body>
+</html>
