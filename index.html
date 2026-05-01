@@ -2572,6 +2572,11 @@ function gameLoop(timestamp) {
       updateProjectiles(dt);
       updateBonusDrop(dt);
       updateParticles(dt);
+      // Allow entering ice cave during wave transition if seal is complete
+      if (Input.up && G.campsite.complete) {
+        startIceCaveTransition();
+        break;
+      }
       if (G.waveTransitionTimer <= 0) {
         G.state = 'PLAYING_CAMPSITE';
         spawnWave();
