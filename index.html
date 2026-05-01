@@ -158,8 +158,8 @@ const EXTRA_LIFE_INTERVAL = 5000;
 const STARTING_LIVES = 3;
 const BASE_CAMPSITE_PIECES = 3;
 const MAX_CAMPSITE_PIECES = 8;
-const EXPLOSIVE_W = 40;
-const EXPLOSIVE_H = 40;
+const EXPLOSIVE_W = 30;
+const EXPLOSIVE_H = 30;
 const EXPLOSIVE_COUNTDOWN = 180; // 3 seconds at 60fps
 const EXPLOSIVE_BLAST_RADIUS = 60; // pixels - kills player if too close
 const SEAL_X = CANVAS_W - 80; // right side of screen
@@ -1453,26 +1453,26 @@ function drawCampsiteStructure(ctx) {
   if (G.campsite.placedExplosive && !G.campsite.placedExplosive.exploded) {
     const exp = G.campsite.placedExplosive;
     // Try TNT sprite, fallback to drawn crate
-    if (!drawSprite(ctx, 'tnt_crate', exp.x, exp.y, 40, 40)) {
+    if (!drawSprite(ctx, 'tnt_crate', exp.x, exp.y, 30, 30)) {
       ctx.fillStyle = '#8B4513';
-      ctx.fillRect(exp.x - 20, exp.y - 20, 40, 40);
+      ctx.fillRect(exp.x - 15, exp.y - 15, 30, 30);
       ctx.strokeStyle = '#5a2d0c';
       ctx.lineWidth = 1;
-      ctx.strokeRect(exp.x - 20, exp.y - 20, 40, 40);
+      ctx.strokeRect(exp.x - 15, exp.y - 15, 30, 30);
       // Cross planks
       ctx.strokeStyle = '#6b3410';
       ctx.beginPath();
-      ctx.moveTo(exp.x - 20, exp.y - 20);
-      ctx.lineTo(exp.x + 20, exp.y + 20);
-      ctx.moveTo(exp.x + 20, exp.y - 20);
-      ctx.lineTo(exp.x - 20, exp.y + 20);
+      ctx.moveTo(exp.x - 15, exp.y - 15);
+      ctx.lineTo(exp.x + 15, exp.y + 15);
+      ctx.moveTo(exp.x + 15, exp.y - 15);
+      ctx.lineTo(exp.x - 15, exp.y + 15);
       ctx.stroke();
     }
     // Flashing fuse spark — keep this
     const spark = Math.floor(exp.countdown / 5) % 2;
     ctx.fillStyle = spark ? '#ff0' : '#f80';
     ctx.beginPath();
-    ctx.arc(exp.x, exp.y - 24, 4, 0, Math.PI * 2);
+    ctx.arc(exp.x, exp.y - 19, 4, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -1699,16 +1699,24 @@ function drawPlayer(ctx) {
     ctx.fillRect(p.x - 4, p.y - 2, 8, 10);
   }
   
-  // Draw carried bomb indicator — upper-left corner of player
+  // Draw carried bomb — top-left corner of the player's frame, 30x30
   if (p.carryingPiece) {
-    const bx = p.x - p.w/2 - 2;
-    const by = p.y - p.h/2 - 2;
-    if (!drawSprite(ctx, 'tnt_crate', bx, by, 16, 16)) {
+    const bx = p.x - p.w/2 + 15;
+    const by = p.y - p.h/2 + 15;
+    const bsz = 30;
+    if (!drawSprite(ctx, 'tnt_crate', bx, by, bsz, bsz)) {
       ctx.fillStyle = '#8B4513';
-      ctx.fillRect(bx - 8, by - 8, 16, 16);
+      ctx.fillRect(bx - bsz/2, by - bsz/2, bsz, bsz);
       ctx.strokeStyle = '#5a2d0c';
       ctx.lineWidth = 1;
-      ctx.strokeRect(bx - 8, by - 8, 16, 16);
+      ctx.strokeRect(bx - bsz/2, by - bsz/2, bsz, bsz);
+      ctx.strokeStyle = '#6b3410';
+      ctx.beginPath();
+      ctx.moveTo(bx - bsz/2, by - bsz/2);
+      ctx.lineTo(bx + bsz/2, by + bsz/2);
+      ctx.moveTo(bx + bsz/2, by - bsz/2);
+      ctx.lineTo(bx - bsz/2, by + bsz/2);
+      ctx.stroke();
     }
   }
   
