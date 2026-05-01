@@ -838,9 +838,116 @@ function initGame() {
     instructionText: '',
     instructionTimer: 0,
     instructionBlink: true,
-    waveStartDelay: 0
+    waveStartDelay: 0,
+    attractMode: false,
+    attractTimer: ATTRACT_TITLE_DURATION,
+    attractPhase: 'title',
+    attractDemoTimer: 0
   };
   updateHUD();
+}
+
+// ---- ATTRACT MODE ----
+const ATTRACT_TITLE_DURATION = 480;  // ~8 seconds on title
+const ATTRACT_DEMO_DURATION = 900;   // ~15 seconds of demo
+
+function startAttractDemo() {
+  G.attractPhase = 'demo';
+  G.attractDemoTimer = ATTRACT_DEMO_DURATION;
+  G.attractMode = true;
+  // Set up a playable campsite stage
+  G.state = 'PLAYING_CAMPSITE';
+  G.previousPlayState = 'PLAYING_CAMPSITE';
+  G.score = 0;
+  G.level = 1;
+  G.lives = STARTING_LIVES;
+  G.wave = 0;
+  G.wavePatternIndex = 0;
+  G.waveCycleBonus = 0;
+  G.elderThings = [];
+  G.shoggoths = [];
+  G.enemyProjectiles = [];
+  G.playerProjectiles = [];
+  G.campsitePieces = [];
+  G.bonusFlyover = null;
+  G.bonusDrop = null;
+  G.particles = [];
+  const req = campsitePiecesRequired(1);
+  G.campsite = { pieces: 0, required: req, complete: false, sealSegments: initSealSegments(req), placedExplosive: null, hintTimer: 0 };
+  G.barriers = createBarriers();
+  G.player.x = CANVAS_W / 2;
+  G.player.y = PLAYER_Y;
+  G.player.invincible = true;
+  G.player.invincibleTimer = 9999; // stay invincible during demo
+  G.player.flashVisible = true;
+  G.player.carryingPiece = null;
+  G.player.shotCooldown = 0;
+  G.player.shieldActive = false;
+  G.player.shieldEnergy = SHIELD_MAX_ENERGY;
+  G.debugInvincible = true;
+  G.instructionText = '';
+  G.instructionTimer = 0;
+  G.waveStartDelay = 0;
+  spawnWave();
+  updateHUD();
+}
+
+function endAttractDemo() {
+  G.attractPhase = 'title';
+  G.attractTimer = ATTRACT_TITLE_DURATION;
+  G.attractMode = false;
+  G.debugInvincible = false;
+  G.state = 'START_SCREEN';
+  initGame();
+  AudioMgr.stopMusic();
+}
+
+function attractAI(dt) {
+  // Simple AI: move toward nearest enemy X, fire periodically
+  const p = G.player;
+  let targetX = CANVAS_W / 2;
+  
+  // Find nearest active elder thing
+  let nearestDist = Infinity;
+  for (const et of G.elderThings) {
+    if (!et.active) continue;
+    const d = Math.abs(et.x - p.x);
+    if (d < nearestDist) {
+      nearestDist = d;
+      targetX = et.x;
+    }
+  }
+  
+  // Dodge: if an enemy projectile is close and heading toward us, shift away
+  for (const proj of G.enemyProjectiles) {
+    if (!proj.active) continue;
+    if (proj.y > p.y - 100 && proj.y < p.y && Math.abs(proj.x - p.x) < 40) {
+      targetX = proj.x < p.x ? p.x + 60 : p.x - 60;
+      break;
+    }
+  }
+  
+  // Clamp target
+  targetX = Math.max(p.w/2, Math.min(CANVAS_W - p.w/2, targetX));
+  
+  // Drive input directly (bypass _keys so real input detection still works)
+  const dx = targetX - p.x;
+  Input.left = dx < -8;
+  Input.right = dx > 8;
+  Input.firePressed = (G.frameCount % 18 === 0);
+  if (Input.firePressed) Input.fireBuffered = true;
+  Input.fire = Input.firePressed;
+  Input.up = false;
+  Input.shield = false;
+}
+
+function checkAttractBreak() {
+  // Any real user key/touch breaks attract mode
+  return Input._keys['ArrowLeft'] || Input._keys['ArrowRight'] ||
+    Input._keys['z'] || Input._keys['Z'] || Input._keys['x'] || Input._keys['X'] ||
+    Input._keys['ArrowUp'] || Input._keys[' '] ||
+    Input._touchLeft || Input._touchRight || Input._touchFire ||
+    Input._touchUp || Input._touchShield;
 }
 
 function updateHUD() {
@@ -2272,6 +2379,18 @@ function render() {
   
   // Debug overlay
   if (G.debug) renderDebug();
+  
+  // Attract mode overlay — "CLICK OR TAP TO START" on top of demo gameplay
+  if (G.attractMode) {
+    // Semi-transparent bar behind text for readability
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, CANVAS_H - 70, CANVAS_W, 50);
+    const blink = Math.floor(Date.now() / 500) % 2;
+    if (blink) {
+      drawNamcoCenter('CLICK OR TAP', CANVAS_H - 64, '#fff', 3);
+      drawNamcoCenter('TO START', CANVAS_H - 36, '#fff', 3);
+    }
+  }
 }
 
 // ---- SCREEN RENDERERS ----
@@ -2515,10 +2634,21 @@ function gameLoop(timestamp) {
   // State machine update
   switch (G.state) {
     case 'START_SCREEN':
-      // Wait for click/tap/space
+      // Attract mode: cycle between title and demo
+      G.attractTimer -= dt;
+      if (G.attractTimer <= 0 && !G.attractMode) {
+        startAttractDemo();
+      }
       break;
       
     case 'PLAYING_CAMPSITE':
+      // Attract mode AI and timer
+      if (G.attractMode) {
+        if (checkAttractBreak()) { endAttractDemo(); break; }
+        G.attractDemoTimer -= dt;
+        if (G.attractDemoTimer <= 0) { endAttractDemo(); break; }
+        attractAI(dt);
+      }
       updatePlayer(dt);
       // Delay wave spawn for instruction display (#14)
       if (G.waveStartDelay > 0) {
@@ -2564,6 +2694,12 @@ function gameLoop(timestamp) {
       break;
       
     case 'WAVE_TRANSITION':
+      // Attract mode: check break and timer
+      if (G.attractMode) {
+        if (checkAttractBreak()) { endAttractDemo(); break; }
+        G.attractDemoTimer -= dt;
+        if (G.attractDemoTimer <= 0) { endAttractDemo(); break; }
+      }
       G.waveTransitionTimer -= dt;
       if (G.instructionTimer > 0) G.instructionTimer -= dt;
       // Player can still move, fire, gather & place explosives during wave pause
@@ -2610,6 +2746,12 @@ function gameLoop(timestamp) {
       break;
       
     case 'DEATH_PAUSE':
+      // Attract mode: skip death, just respawn
+      if (G.attractMode) {
+        if (checkAttractBreak()) { endAttractDemo(); break; }
+        G.attractDemoTimer -= dt;
+        if (G.attractDemoTimer <= 0) { endAttractDemo(); break; }
+      }
       G.deathTimer -= dt;
       updateParticles(dt);
       // Keep enemies moving during death pause
@@ -2649,6 +2791,9 @@ function gameLoop(timestamp) {
 
 // ---- SYSTEM KEY HANDLING ----
 function handleSystemKeys() {
+  // Ignore system keys during attract mode
+  if (G.attractMode) return;
+  
   // P - Pause (only in playing states)
   if (Input._keys['p'] || Input._keys['P']) {
     Input._keys['p'] = false;
@@ -2725,6 +2870,11 @@ function handleSystemKeys() {
 
 // ---- START GAME CLICK/TAP HANDLER ----
 function handleStartClick() {
+  // Break out of attract mode demo on click/tap
+  if (G.attractMode) {
+    endAttractDemo();
+    // Fall through to start the game from title
+  }
   if (isKeyAllowed('start') && G.state === 'START_SCREEN') {
     AudioMgr.init();
     initGame();
