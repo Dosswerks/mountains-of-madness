@@ -877,8 +877,8 @@ function startAttractDemo() {
   G.barriers = createBarriers();
   G.player.x = CANVAS_W / 2;
   G.player.y = PLAYER_Y;
-  G.player.invincible = true;
-  G.player.invincibleTimer = 9999; // stay invincible during demo
+  G.player.invincible = false;
+  G.player.invincibleTimer = 0;
   G.player.flashVisible = true;
   G.player.carryingPiece = null;
   G.player.shotCooldown = 0;
@@ -2380,15 +2380,12 @@ function render() {
   // Debug overlay
   if (G.debug) renderDebug();
   
-  // Attract mode overlay — "CLICK OR TAP TO START" on top of demo gameplay
+  // Attract mode overlay — "CLICK OR TAP TO START" same position as title screen
   if (G.attractMode) {
-    // Semi-transparent bar behind text for readability
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(0, CANVAS_H - 70, CANVAS_W, 50);
     const blink = Math.floor(Date.now() / 500) % 2;
     if (blink) {
-      drawNamcoCenter('CLICK OR TAP', CANVAS_H - 64, '#fff', 3);
-      drawNamcoCenter('TO START', CANVAS_H - 36, '#fff', 3);
+      drawNamcoCenter('CLICK OR TAP', 480, '#fff', 3);
+      drawNamcoCenter('TO START', 508, '#fff', 3);
     }
   }
 }
