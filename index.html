@@ -2328,13 +2328,13 @@ function renderGameOver() {
   drawNamcoCenter('FINAL SCORE: ' + G.score, 260, '#fff', 2);
   drawNamcoCenter('LEVEL: ' + G.level, 286, '#fff', 2);
   
-  drawNamcoCenter('PRESS R OR CLICK', 350, '#ccc', 1);
-  drawNamcoCenter('TO RESTART', 366, '#ccc', 1);
-  drawNamcoCenter('PRESS Q FOR TITLE', 390, '#ccc', 1);
+  drawNamcoCenter('PRESS R OR CLICK', 340, '#ccc', 2);
+  drawNamcoCenter('TO RESTART', 362, '#ccc', 2);
+  drawNamcoCenter('PRESS Q FOR TITLE', 392, '#ccc', 2);
   // Tip jar QR on game over screen
   if(qrImg){
-    var qrS=56,qrX=CANVAS_W/2-qrS/2,qrY=CANVAS_H/2+143;
-    drawNamcoCenter('TIPS KEEP THE GAMES COMING!', qrY - 14, '#fff', 1);
+    var qrS=56,qrX=CANVAS_W/2-qrS/2,qrY=CANVAS_H/2+130;
+    drawNamcoCenter('TIPS KEEP THE GAMES COMING!', qrY - 14, '#fff', 2);
     ctx.fillStyle='#fff';ctx.fillRect(qrX-3,qrY+7,qrS+6,qrS+6);
     ctx.drawImage(qrImg,qrX,qrY+10,qrS,qrS);
   }
