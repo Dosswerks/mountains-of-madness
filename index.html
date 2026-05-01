@@ -2311,23 +2311,21 @@ function renderTransition() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   
-  // Large centered transition text — Namco font, scale 3
+  // Large centered transition text — Namco font, scale 3 (upper portion)
   if (G.transitionText.includes('ICE CAVE')) {
-    drawNamcoCenter('ENTERING THE', CANVAS_H/2 - 60, '#fff', 3);
-    drawNamcoCenter('ICE CAVE...', CANVAS_H/2 - 30, '#fff', 3);
+    drawNamcoCenter('ENTERING THE', CANVAS_H/2 - 120, '#fff', 3);
+    drawNamcoCenter('ICE CAVE...', CANVAS_H/2 - 90, '#fff', 3);
   } else {
-    drawNamcoCenter('RETURNING TO', CANVAS_H/2 - 60, '#fff', 3);
-    drawNamcoCenter('THE CAMPSITE', CANVAS_H/2 - 30, '#fff', 3);
-    drawNamcoCenter('LEVEL ' + G.level, CANVAS_H/2 + 4, '#ff0', 3);
+    drawNamcoCenter('RETURNING TO', CANVAS_H/2 - 130, '#fff', 3);
+    drawNamcoCenter('THE CAMPSITE', CANVAS_H/2 - 100, '#fff', 3);
+    drawNamcoCenter('LEVEL ' + G.level, CANVAS_H/2 - 66, '#ff0', 3);
   }
   
-  // Transition graphic placeholder (#13 ice cave, #16 campsite)
+  // Transition graphic (lower portion, well below text)
   if (G.transitionText.includes('ICE CAVE')) {
-    // Ice cave transition graphic — try sprite, fallback to drawn graphic
-    if (!drawSprite(ctx, 'transition_icecave', CANVAS_W/2, CANVAS_H/2 + 30, 120, 120)) {
-      // Fallback: stylized ice crystal
+    if (!drawSprite(ctx, 'transition_icecave', CANVAS_W/2, CANVAS_H/2 + 60, 120, 120)) {
       ctx.save();
-      ctx.translate(CANVAS_W/2, CANVAS_H/2 + 30);
+      ctx.translate(CANVAS_W/2, CANVAS_H/2 + 60);
       ctx.fillStyle = '#4af';
       ctx.globalAlpha = 0.6 + Math.sin(Date.now() * 0.003) * 0.3;
       ctx.beginPath();
@@ -2342,11 +2340,9 @@ function renderTransition() {
       ctx.restore();
     }
   } else {
-    // Campsite transition graphic — try sprite, fallback to drawn graphic
-    if (!drawSprite(ctx, 'transition_campsite', CANVAS_W/2, CANVAS_H/2 + 30, 120, 120)) {
-      // Fallback: stylized mountain silhouette
+    if (!drawSprite(ctx, 'transition_campsite', CANVAS_W/2, CANVAS_H/2 + 60, 120, 120)) {
       ctx.save();
-      ctx.translate(CANVAS_W/2, CANVAS_H/2 + 30);
+      ctx.translate(CANVAS_W/2, CANVAS_H/2 + 60);
       ctx.fillStyle = '#446';
       ctx.globalAlpha = 0.7;
       ctx.beginPath();
@@ -2354,7 +2350,6 @@ function renderTransition() {
       ctx.lineTo(20, -40); ctx.lineTo(50, 30);
       ctx.closePath();
       ctx.fill();
-      // Snow caps
       ctx.fillStyle = '#aac';
       ctx.beginPath();
       ctx.moveTo(-20, -30); ctx.lineTo(-12, -18); ctx.lineTo(-28, -18);
@@ -2371,7 +2366,7 @@ function renderTransition() {
   
   // Loading dots animation
   const dots = '.'.repeat(Math.floor(G.frameCount / 20) % 4);
-  drawNamcoCenter(dots, CANVAS_H/2 + 80, '#fff', 1);
+  drawNamcoCenter(dots, CANVAS_H/2 + 140, '#fff', 1);
 }
 
 function renderDebug() {
