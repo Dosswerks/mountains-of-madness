@@ -14,11 +14,19 @@ body{background:#0a0a1a;display:flex;justify-content:center;align-items:flex-sta
 canvas{display:block;width:100%;height:auto;border:1px solid #fff}
 #touch-controls{display:none;width:100%;padding:8px 0;justify-content:space-between;align-items:center}
 #touch-left-group{display:flex;gap:8px}
+#touch-center-group{display:flex;justify-content:center}
 #touch-right-group{display:flex;gap:8px}
-.touch-btn{width:56px;height:56px;border:2px solid #fff;background:rgba(255,255,255,0.1);color:#fff;font-size:18px;font-weight:bold;border-radius:8px;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:manipulation;cursor:pointer}
-.touch-btn:active{background:rgba(255,255,255,0.4)}
-#credits{width:100%;text-align:center;color:#888;font-size:11px;padding:8px 4px;line-height:1.6}
-#credits a{color:#aaa;text-decoration:none}
+.touch-btn{width:60px;height:60px;border:3px solid rgba(255,255,255,0.3);color:#fff;font-size:13px;font-weight:bold;border-radius:50%;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:manipulation;cursor:pointer}
+.touch-btn:active{opacity:0.7;transform:scale(0.93)}
+.touch-red{background:rgba(220,40,40,0.7);border-color:rgba(255,80,80,0.6)}
+.touch-blue{background:rgba(40,80,220,0.7);border-color:rgba(80,120,255,0.6)}
+.touch-purple{background:rgba(140,40,200,0.7);border-color:rgba(180,80,255,0.6)}
+.touch-yellow{background:rgba(200,180,40,0.7);border-color:rgba(240,220,80,0.6);color:#000}
+.tri{display:block;width:0;height:0;border:10px solid transparent}
+.tri-left{border-right-color:#000;border-left:none;margin-right:4px}
+.tri-right{border-left-color:#000;border-right:none;margin-left:4px}
+#credits{width:100%;text-align:center;color:#999;font-size:12px;padding:10px 8px 4px;line-height:1.4;font-family:Georgia,'Times New Roman',serif;letter-spacing:0.3px}
+#credits a{color:#c8a832;text-decoration:none}
 #credits a:hover{color:#fff;text-decoration:underline}
 @media(max-width:500px){
   #touch-controls{display:flex!important}
@@ -37,13 +45,15 @@ canvas{display:block;width:100%;height:auto;border:1px solid #fff}
   <canvas id="gameCanvas" width="480" height="600"></canvas>
   <div id="touch-controls">
     <div id="touch-left-group">
-      <button class="touch-btn" id="btn-left">◀</button>
-      <button class="touch-btn" id="btn-right">▶</button>
-      <button class="touch-btn" id="btn-up">▲</button>
+      <button class="touch-btn touch-yellow" id="btn-left"><span class="tri tri-left"></span></button>
+      <button class="touch-btn touch-yellow" id="btn-right"><span class="tri tri-right"></span></button>
+    </div>
+    <div id="touch-center-group">
+      <button class="touch-btn touch-purple" id="btn-up">CAVE</button>
     </div>
     <div id="touch-right-group">
-      <button class="touch-btn" id="btn-shield">SH</button>
-      <button class="touch-btn" id="btn-fire">FIRE</button>
+      <button class="touch-btn touch-blue" id="btn-shield">SH</button>
+      <button class="touch-btn touch-red" id="btn-fire">FIRE</button>
     </div>
   </div>
   <div id="credits">Based on <a href="https://www.hplovecraft.com/writings/fiction/mm.aspx" target="_blank"><em></em>At the Mountains of Madness</em></a> by H.P. Lovecraft.<br>A game by <a href="https://www.andrewdoss.com" target="_blank">Andrew Doss</a>. &copy; 2026 Andrew Doss. All Rights Reserved.</div>
@@ -151,6 +161,70 @@ const SEAL_COLS = 3;
 const SEAL_ROWS = 3;
 const MAX_ELDER_THINGS = 16;
 const MAX_SHOGGOTHS = 4; // full splits to 2 half, each to 2 quarter = 4 quarter max
+const SHOGGOTH_HP_FULL = 3;
+const SHOGGOTH_HP_HALF = 3;
+const SHOGGOTH_HP_QUARTER = 3;
+
+// ---- NAMCO 8x8 PIXEL FONT ----
+const FONT = {
+  '0':[0x3C,0x66,0x6E,0x76,0x66,0x66,0x3C,0x00],'1':[0x18,0x38,0x18,0x18,0x18,0x18,0x7E,0x00],
+  '2':[0x3C,0x66,0x06,0x1C,0x30,0x66,0x7E,0x00],'3':[0x3C,0x66,0x06,0x1C,0x06,0x66,0x3C,0x00],
+  '4':[0x0E,0x1E,0x36,0x66,0x7F,0x06,0x06,0x00],'5':[0x7E,0x60,0x7C,0x06,0x06,0x66,0x3C,0x00],
+  '6':[0x1C,0x30,0x60,0x7C,0x66,0x66,0x3C,0x00],'7':[0x7E,0x66,0x06,0x0C,0x18,0x18,0x18,0x00],
+  '8':[0x3C,0x66,0x66,0x3C,0x66,0x66,0x3C,0x00],'9':[0x3C,0x66,0x66,0x3E,0x06,0x0C,0x38,0x00],
+  'A':[0x18,0x3C,0x66,0x66,0x7E,0x66,0x66,0x00],'B':[0x7C,0x66,0x66,0x7C,0x66,0x66,0x7C,0x00],
+  'C':[0x3C,0x66,0x60,0x60,0x60,0x66,0x3C,0x00],'D':[0x78,0x6C,0x66,0x66,0x66,0x6C,0x78,0x00],
+  'E':[0x7E,0x60,0x60,0x7C,0x60,0x60,0x7E,0x00],'F':[0x7E,0x60,0x60,0x7C,0x60,0x60,0x60,0x00],
+  'G':[0x3C,0x66,0x60,0x6E,0x66,0x66,0x3E,0x00],'H':[0x66,0x66,0x66,0x7E,0x66,0x66,0x66,0x00],
+  'I':[0x3C,0x18,0x18,0x18,0x18,0x18,0x3C,0x00],'J':[0x06,0x06,0x06,0x06,0x06,0x66,0x3C,0x00],
+  'K':[0x66,0x6C,0x78,0x70,0x78,0x6C,0x66,0x00],'L':[0x60,0x60,0x60,0x60,0x60,0x60,0x7E,0x00],
+  'M':[0x63,0x77,0x7F,0x6B,0x63,0x63,0x63,0x00],'N':[0x66,0x76,0x7E,0x7E,0x6E,0x66,0x66,0x00],
+  'O':[0x3C,0x66,0x66,0x66,0x66,0x66,0x3C,0x00],'P':[0x7C,0x66,0x66,0x7C,0x60,0x60,0x60,0x00],
+  'Q':[0x3C,0x66,0x66,0x66,0x6A,0x6C,0x36,0x00],'R':[0x7C,0x66,0x66,0x7C,0x6C,0x66,0x66,0x00],
+  'S':[0x3C,0x66,0x60,0x3C,0x06,0x66,0x3C,0x00],'T':[0x7E,0x18,0x18,0x18,0x18,0x18,0x18,0x00],
+  'U':[0x66,0x66,0x66,0x66,0x66,0x66,0x3C,0x00],'V':[0x66,0x66,0x66,0x66,0x66,0x3C,0x18,0x00],
+  'W':[0x63,0x63,0x63,0x6B,0x7F,0x77,0x63,0x00],'X':[0x66,0x66,0x3C,0x18,0x3C,0x66,0x66,0x00],
+  'Y':[0x66,0x66,0x66,0x3C,0x18,0x18,0x18,0x00],'Z':[0x7E,0x06,0x0C,0x18,0x30,0x60,0x7E,0x00],
+  ' ':[0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00],':':[0x00,0x18,0x18,0x00,0x18,0x18,0x00,0x00],
+  '.':[0x00,0x00,0x00,0x00,0x00,0x18,0x18,0x00],'-':[0x00,0x00,0x00,0x3C,0x00,0x00,0x00,0x00],
+  '!':[0x18,0x18,0x18,0x18,0x18,0x00,0x18,0x00],'?':[0x3C,0x66,0x06,0x0C,0x18,0x00,0x18,0x00],
+  '/':[0x02,0x06,0x0C,0x18,0x30,0x60,0x40,0x00],'+':[0x00,0x18,0x18,0x7E,0x18,0x18,0x00,0x00],
+  ',':[0x00,0x00,0x00,0x00,0x00,0x18,0x18,0x30],'(':[0x0C,0x18,0x30,0x30,0x30,0x18,0x0C,0x00],
+  ')':[0x30,0x18,0x0C,0x0C,0x0C,0x18,0x30,0x00]
+};
+
+// Draw a single Namco char at pixel scale
+function drawNamcoChar(ch, x, y, color, scale) {
+  const glyph = FONT[ch];
+  if (!glyph) return;
+  ctx.fillStyle = color;
+  for (let row = 0; row < 8; row++) {
+    const bits = glyph[row];
+    for (let col = 0; col < 8; col++) {
+      if (bits & (1 << (7 - col))) {
+        ctx.fillRect(x + col * scale, y + row * scale, scale, scale);
+      }
+    }
+  }
+}
+
+// Draw Namco text at given position and scale (1=8px, 2=16px, etc.)
+function drawNamco(text, x, y, color, scale) {
+  scale = scale || 1;
+  color = color || '#fff';
+  const str = String(text).toUpperCase();
+  for (let i = 0; i < str.length; i++) {
+    drawNamcoChar(str[i], x + i * 8 * scale, y, color, scale);
+  }
+}
+
+// Draw Namco text centered horizontally
+function drawNamcoCenter(text, y, color, scale) {
+  scale = scale || 1;
+  const str = String(text).toUpperCase();
+  const w = str.length * 8 * scale;
+  drawNamco(str, Math.round((CANVAS_W - w) / 2), y, color, scale);
+}
 
 // ---- ASSET CONFIG ----
 const ASSET_CONFIG = {
@@ -162,7 +236,10 @@ const ASSET_CONFIG = {
     bonus_flyover:'assets/bonus_flyover.png',campsite:'assets/campsite.png',seal_boulder:'assets/seal_boulder.png',
     projectile_player:'assets/projectile_player.png',projectile_enemy:'assets/projectile_enemy.png',projectile_spiral:'assets/projectile_spiral.png',bonus_drop:'assets/bonus_drop.png',
     bg_campsite:'assets/bg_campsite.png',bg_icecave:'assets/bg_icecave.png',bg_gameover:'assets/bg_gameover.png',
-    box_art:'assets/box_art.png'
+    box_art:'assets/box_art.png',
+    tnt_crate:'assets/tnt_crate.png',
+    transition_icecave:'assets/transition_icecave.png',
+    transition_campsite:'assets/transition_campsite.png'
   },
   audio: {
     music_campsite:'assets/music_campsite.mp3',music_icecave:'assets/music_icecave.mp3',
@@ -173,7 +250,8 @@ const ASSET_CONFIG = {
     sfx_piece_pickup:'assets/sfx_piece_pickup.mp3',sfx_piece_place:'assets/sfx_piece_place.mp3',
     sfx_campsite_complete:'assets/sfx_campsite_complete.mp3',sfx_seal_explosion:'assets/sfx_seal_explosion.mp3',sfx_barrier_hit:'assets/sfx_barrier_hit.mp3',
     sfx_transition:'assets/sfx_transition.mp3',sfx_wave_start:'assets/sfx_wave_start.mp3',
-    sfx_game_over:'assets/sfx_game_over.mp3',sfx_game_start:'assets/sfx_game_start.mp3',sfx_boss_start:'assets/sfx_boss_start.mp3'
+    sfx_game_over:'assets/sfx_game_over.mp3',sfx_game_start:'assets/sfx_game_start.mp3',sfx_boss_start:'assets/sfx_boss_start.mp3',
+    sfx_bomb_place:'assets/sfx_bomb_place.mp3',sfx_bonus_collect:'assets/sfx_bonus_collect.mp3'
   }
 };
 
@@ -438,10 +516,7 @@ function drawParticles(ctx) {
   for (const p of G.particles) {
     ctx.globalAlpha = p.alpha;
     if (p.type === 'score_text') {
-      ctx.fillStyle = p.color;
-      ctx.font = p.size + 'px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(p.text, p.x, p.y);
+      drawNamcoCenter(p.text, p.y, p.color, 1);
     } else if (p.type === 'flash') {
       const radius = p.size * (1 - p.life / p.maxLife * 0.5);
       ctx.beginPath();
@@ -690,7 +765,8 @@ function initGame() {
     entrySubgroupSide: 'left',
     instructionText: '',
     instructionTimer: 0,
-    instructionBlink: true
+    instructionBlink: true,
+    waveStartDelay: 0
   };
   updateHUD();
 }
@@ -1026,8 +1102,10 @@ function spawnShoggoth(size, x, y, baseSpd) {
     fireTimer: 20 + Math.random() * 20,
     fireInterval: 30,
     points: points,
-    spawnZoom: size === 'full' ? 1.0 : 0, // full-size shoggoths zoom in
-    spawnZoomTimer: size === 'full' ? 60 : 0 // ~1 second zoom-in
+    spawnZoom: size === 'full' ? 1.0 : 0,
+    spawnZoomTimer: size === 'full' ? 60 : 0,
+    hp: size === 'full' ? SHOGGOTH_HP_FULL : size === 'half' ? SHOGGOTH_HP_HALF : SHOGGOTH_HP_QUARTER,
+    hitFlashTimer: 0
   };
   // Full-size shoggoths start invincible during zoom-in
   if (size === 'full') {
@@ -1059,6 +1137,9 @@ function updateShoggoths(dt) {
       }
     }
     
+    // Hit flash timer (yellow flash on damage)
+    if (s.hitFlashTimer > 0) s.hitFlashTimer -= dt;
+    
     // Animation
     s.animTimer += dt;
     if (s.animTimer >= SHOGGOTH_ANIM_INTERVAL) {
@@ -1077,13 +1158,13 @@ function updateShoggoths(dt) {
     if (s.y - s.h/2 < 30) { s.y = 30 + s.h/2; s.vy = Math.abs(s.vy); }
     if (s.y + s.h/2 > CANVAS_H - 100) { s.y = CANVAS_H - 100 - s.h/2; s.vy = -Math.abs(s.vy); }
     
-    // Fire spiral projectiles — intensity doubles with each split
+    // Fire spiral projectiles — reduced intensity
     if (!s.invincible) {
       s.fireTimer -= dt;
-      const fireRateMult = s.size === 'full' ? 1 : s.size === 'half' ? 2 : 4;
+      const fireRateMult = s.size === 'full' ? 0.5 : s.size === 'half' ? 0.7 : 1;
       const projSpeed = enemyProjectileSpeed(G.level) * 0.8;
       if (s.fireTimer <= 0 && G.enemyProjectiles.length < MAX_ENEMY_PROJECTILES) {
-        s.fireTimer = (s.fireInterval + Math.random() * 40) / fireRateMult;
+        s.fireTimer = (s.fireInterval * 3 + Math.random() * 80) / fireRateMult;
         // Aim toward player
         const dx = G.player.x - s.x;
         const dy = G.player.y - s.y;
@@ -1104,21 +1185,25 @@ function updateShoggoths(dt) {
 
 function hitShoggoth(s) {
   if (s.invincible) return false;
+  s.hp--;
+  s.hitFlashTimer = 12; // yellow flash for ~0.2s
+  spawnFlash(s.x, s.y, '#ff0');
+  AudioMgr.playSFX('sfx_shoggoth_split', 0.25);
+  
+  if (s.hp > 0) return true; // damaged but not dead yet
+  
   s.active = false;
   addScore(s.points, s.x, s.y);
   
   if (s.size === 'full') {
     spawnExplosion(s.x, s.y, 12, '#f0a');
-    AudioMgr.playSFX('sfx_shoggoth_split', 0.25);
     spawnShoggoth('half', s.x - s.w/2, s.y, s.baseSpeed);
     spawnShoggoth('half', s.x + s.w/2, s.y, s.baseSpeed);
   } else if (s.size === 'half') {
     spawnExplosion(s.x, s.y, 12, '#f0a');
-    AudioMgr.playSFX('sfx_shoggoth_split', 0.25);
     spawnShoggoth('quarter', s.x - s.w/3, s.y, s.baseSpeed);
     spawnShoggoth('quarter', s.x + s.w/3, s.y, s.baseSpeed);
   } else {
-    // Req 29.3: larger particle explosion for quarter-sized destruction
     spawnExplosion(s.x, s.y, 20, '#f0a');
     AudioMgr.playSFX('sfx_shoggoth_destroy', 0.25);
   }
@@ -1166,6 +1251,14 @@ function drawShoggoth(ctx, s) {
     ctx.arc(-pulseW*0.2, -pulseH*0.1, eyeSize, 0, Math.PI*2);
     ctx.arc(pulseW*0.2, -pulseH*0.1, eyeSize, 0, Math.PI*2);
     ctx.fill();
+  }
+  
+  // Yellow hit flash overlay
+  if (s.hitFlashTimer > 0) {
+    ctx.globalAlpha = Math.min(1, s.hitFlashTimer / 6) * 0.7;
+    ctx.fillStyle = '#ff0';
+    ctx.fillRect(-pulseW/2, -pulseH/2, pulseW, pulseH);
+    ctx.globalAlpha = 1;
   }
   
   ctx.restore();
@@ -1227,6 +1320,7 @@ function updateCampsite(dt) {
   if (G.player.carryingPiece && G.player.x > CANVAS_W - 70) {
     G.player.carryingPiece = null;
     AudioMgr.playSFX('sfx_piece_place');
+    AudioMgr.playSFX('sfx_seal_explosion', 0.15); // bomb placement sound
     // Place explosive at the base of the seal
     G.campsite.placedExplosive = {
       x: SEAL_X, y: SEAL_Y,
@@ -1316,9 +1410,14 @@ function drawCampsiteStructure(ctx) {
   // Draw placed explosive with countdown
   if (G.campsite.placedExplosive && !G.campsite.placedExplosive.exploded) {
     const exp = G.campsite.placedExplosive;
-    // Explosive body
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(exp.x - 10, exp.y - 8, 20, 16);
+    // Try TNT sprite, fallback to drawn crate
+    if (!drawSprite(ctx, 'tnt_crate', exp.x, exp.y, 20, 16)) {
+      ctx.fillStyle = '#8B4513';
+      ctx.fillRect(exp.x - 10, exp.y - 8, 20, 16);
+      ctx.strokeStyle = '#5a2d0c';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(exp.x - 10, exp.y - 8, 20, 16);
+    }
     // Fuse spark
     const spark = Math.floor(exp.countdown / 5) % 2;
     ctx.fillStyle = spark ? '#ff0' : '#f80';
@@ -1327,10 +1426,7 @@ function drawCampsiteStructure(ctx) {
     ctx.fill();
     // Countdown number
     const secondsLeft = Math.ceil(exp.countdown / 60);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 18px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(secondsLeft.toString(), exp.x, exp.y - 18);
+    drawNamcoCenter(secondsLeft.toString(), exp.y - 26, '#fff', 1);
   }
 }
 
@@ -1338,33 +1434,39 @@ function drawCampsitePieces(ctx) {
   // Draw unplaced explosives
   for (const piece of G.campsitePieces) {
     if (!piece.active || piece.pickedUp) continue;
-    // Explosive crate
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(piece.x - piece.w/2, piece.y - piece.h/2, piece.w, piece.h);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 10px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('TNT', piece.x, piece.y + 4);
+    // Try TNT sprite first, fallback to drawn crate
+    if (!drawSprite(ctx, 'tnt_crate', piece.x, piece.y, piece.w, piece.h)) {
+      // Fallback: brown crate with TNT label
+      ctx.fillStyle = '#8B4513';
+      ctx.fillRect(piece.x - piece.w/2, piece.y - piece.h/2, piece.w, piece.h);
+      ctx.strokeStyle = '#5a2d0c';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(piece.x - piece.w/2, piece.y - piece.h/2, piece.w, piece.h);
+      // Cross planks
+      ctx.strokeStyle = '#6b3410';
+      ctx.beginPath();
+      ctx.moveTo(piece.x - piece.w/2, piece.y - piece.h/2);
+      ctx.lineTo(piece.x + piece.w/2, piece.y + piece.h/2);
+      ctx.moveTo(piece.x + piece.w/2, piece.y - piece.h/2);
+      ctx.lineTo(piece.x - piece.w/2, piece.y + piece.h/2);
+      ctx.stroke();
+      drawNamcoCenter('TNT', piece.y - 3, '#ff0', 1);
+    }
   }
 }
 
 function drawCampsiteOverlay(ctx) {
   if (G.state === 'PLAYING_CAMPSITE' || G.state === 'WAVE_TRANSITION') {
-    ctx.fillStyle = '#fff';
-    ctx.font = '12px monospace';
-    ctx.textAlign = 'center';
     if (G.campsite.complete) {
-      ctx.fillStyle = '#fff';
-      ctx.fillText('CAVE OPEN — PRESS UP TO ENTER THE ICE CAVE', CANVAS_W/2, 20);
+      drawNamcoCenter('CAVE OPEN - PRESS UP TO ENTER', 20, '#fff', 1);
     } else {
       const destroyed = G.campsite.sealSegments.filter(s => !s.intact).length;
       const total = G.campsite.sealSegments.length;
-      ctx.fillText('SEAL: ' + destroyed + '/' + total, CANVAS_W/2, 20);
-      // Hint when player tries to enter before seal is destroyed
+      drawNamcoCenter('SEAL: ' + destroyed + '/' + total, 20, '#fff', 1);
+      // Hint when player tries to enter before seal is destroyed — now centered on screen
       if (G.campsite.hintTimer > 0) {
-        ctx.fillStyle = '#fff';
-        ctx.font = '11px monospace';
-        ctx.fillText('DESTROY ALL SEAL SEGMENTS TO OPEN THE CAVE', CANVAS_W/2, 38);
+        drawNamcoCenter('DESTROY ALL SEAL SEGMENTS', CANVAS_H/2 - 10, '#ff0', 1);
+        drawNamcoCenter('TO OPEN THE CAVE', CANVAS_H/2 + 4, '#ff0', 1);
       }
     }
     
@@ -1372,12 +1474,9 @@ function drawCampsiteOverlay(ctx) {
     if (G.instructionTimer > 0) {
       const show = G.instructionBlink ? (Math.floor(Date.now() / 500) % 2) : 1;
       if (show) {
-        ctx.fillStyle = '#fff';
-        ctx.font = '14px monospace';
-        ctx.textAlign = 'center';
         const lines = G.instructionText.split('\n');
         for (let i = 0; i < lines.length; i++) {
-          ctx.fillText(lines[i], CANVAS_W/2, CANVAS_H/2 + i * 20);
+          drawNamcoCenter(lines[i], CANVAS_H/2 - 8 + i * 14, '#fff', 1);
         }
       }
     }
@@ -1465,6 +1564,7 @@ function updateBonusDrop(dt) {
   const p = G.player;
   if (Math.abs(p.x - bd.x) < (p.w/2 + bd.w/2) && Math.abs(p.y - bd.y) < (p.h/2 + bd.h/2)) {
     addScore(bd.points, bd.x, bd.y);
+    AudioMgr.playSFX('sfx_bonus_hit');
     G.bonusDrop = null;
   }
 }
@@ -1477,10 +1577,7 @@ function drawBonusDrop(ctx) {
   if (!drawSprite(ctx, 'bonus_drop', bd.x, bd.y, bd.w, bd.h)) {
     ctx.fillStyle = '#ff0';
     ctx.fillRect(bd.x - bd.w/2, bd.y - bd.h/2, bd.w, bd.h);
-    ctx.fillStyle = '#000';
-    ctx.font = 'bold 9px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('1000', bd.x, bd.y + 3);
+    drawNamcoCenter('1000', bd.y - 3, '#000', 1);
   }
   ctx.restore();
 }
@@ -1558,12 +1655,11 @@ function drawPlayer(ctx) {
   
   // Draw carried explosive indicator
   if (p.carryingPiece) {
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(p.x - 8, p.y - p.h/2 - 12, 16, 10);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 7px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('TNT', p.x, p.y - p.h/2 - 4);
+    if (!drawSprite(ctx, 'tnt_crate', p.x, p.y - p.h/2 - 7, 16, 10)) {
+      ctx.fillStyle = '#8B4513';
+      ctx.fillRect(p.x - 8, p.y - p.h/2 - 12, 16, 10);
+    }
+    drawNamcoCenter('TNT', p.y - p.h/2 - 12, '#ff0', 1);
   }
   
   // Draw shield
@@ -1659,7 +1755,10 @@ function runCollisions() {
         proj.active = false;
         et.active = false;
         addScore(et.points, et.x, et.y);
-        spawnExplosion(et.x, et.y, 10, '#a0f');
+        // Impressive yellow explosion (#15)
+        spawnExplosion(et.x, et.y, 18, '#ff0');
+        spawnExplosion(et.x, et.y, 8, '#fa0');
+        spawnFlash(et.x, et.y, '#ff0');
         AudioMgr.playSFX('sfx_elder_destroy');
         // Spawn campsite piece
         spawnCampsitePiece();
@@ -1693,7 +1792,7 @@ function runCollisions() {
         G.bonusDrop = {
           x: G.bonusFlyover.x, y: G.bonusFlyover.y,
           w: 40, h: 40,
-          vy: 2, // fall speed
+          vy: 6, // fast fall speed
           points: G.bonusFlyover.points,
           timer: 300, // ~5 seconds on the ground before disappearing
           grounded: false
@@ -1822,15 +1921,19 @@ function startIceCaveTransition() {
   G.transitionTimer = TRANSITION_DURATION;
   AudioMgr.playSFX('sfx_transition');
   AudioMgr.stopMusic();
+  // Start ice cave music during the transition screen (#12)
+  AudioMgr.playMusic('icecave');
 }
 
 function startCampsiteTransition() {
   G.level++;
   G.state = 'SCREEN_TRANSITION';
-  G.transitionText = 'RETURNING TO THE CAMPSITE — LEVEL ' + G.level;
+  G.transitionText = 'RETURNING TO THE CAMPSITE - LEVEL ' + G.level;
   G.transitionTimer = TRANSITION_DURATION;
   AudioMgr.playSFX('sfx_transition');
   AudioMgr.stopMusic();
+  // Start campsite music during the transition screen (#16)
+  AudioMgr.playMusic('campsite');
   updateHUD();
 }
 
@@ -1849,7 +1952,7 @@ function enterIceCave() {
   const baseSpd = shoggothBaseSpeed(G.level);
   spawnShoggoth('full', CANVAS_W/2, 150, baseSpd);
   
-  AudioMgr.playMusic('icecave');
+  // Music already started during transition screen
   AudioMgr.playSFX('sfx_boss_start');
   respawnPlayer();
 }
@@ -1867,15 +1970,24 @@ function enterCampsite() {
   G.campsitePieces = [];
   G.bonusFlyover = null;
   const req = campsitePiecesRequired(G.level);
-  G.campsite = { pieces: 0, required: req, complete: false, sealSegments: initSealSegments(req), placedExplosive: null };
+  G.campsite = { pieces: 0, required: req, complete: false, sealSegments: initSealSegments(req), placedExplosive: null, hintTimer: 0 };
   G.barriers = createBarriers();
   
-  spawnWave();
-  AudioMgr.playMusic('campsite');
+  // Music already started during transition screen
   respawnPlayer();
-  G.instructionText = 'Destroy the Cyclopean Stones\nto Enter the Cave';
-  G.instructionTimer = 300; // ~5 seconds at 60fps
-  G.instructionBlink = false;
+  
+  // Show instruction text immediately, delay wave spawn (#14)
+  if (G.level === 1) {
+    G.instructionText = 'DESTROY THE CYCLOPEAN STONES\nTO ENTER THE CAVE';
+    G.instructionTimer = 180; // ~3 seconds
+    G.instructionBlink = false;
+    G.waveStartDelay = 180; // delay wave spawn so instructions are visible
+  } else {
+    G.instructionText = 'LEVEL ' + G.level;
+    G.instructionTimer = 120;
+    G.instructionBlink = false;
+    G.waveStartDelay = 120;
+  }
 }
 
 // ---- CLEANUP ----
@@ -2024,12 +2136,8 @@ function render() {
   if (G.state === 'PAUSED') {
     ctx.fillStyle = 'rgba(0,0,0,0.7)';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-    ctx.fillStyle = '#fff';
-    ctx.font = '36px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('PAUSED', CANVAS_W/2, CANVAS_H/2);
-    ctx.font = '14px monospace';
-    ctx.fillText('Press P to resume', CANVAS_W/2, CANVAS_H/2 + 40);
+    drawNamcoCenter('PAUSED', CANVAS_H/2 - 10, '#fff', 3);
+    drawNamcoCenter('PRESS P TO RESUME', CANVAS_H/2 + 30, '#ccc', 1);
   }
   
   if (G.state === 'DEATH_PAUSE') {
@@ -2047,33 +2155,25 @@ function renderStartScreen() {
     drawSprite(ctx, 'box_art', CANVAS_W/2, CANVAS_H/2, CANVAS_W, CANVAS_H);
   }
   
-  ctx.textAlign = 'center';
+  // Subtitle — Namco font, larger center text (#1, #3)
+  drawNamcoCenter('MOUNTAINS OF MADNESS', 270, '#fff', 2);
+  drawNamcoCenter('LOVECRAFT ARCADE VOLUME 1', 296, '#aaa', 1);
   
-  // Subtitle
-  ctx.fillStyle = '#fff';
-  ctx.font = '14px monospace';
-  ctx.fillText('Mountains Of Madness', CANVAS_W/2, 282);
-  ctx.fillText('Lovecraft Arcade Volume 1', CANVAS_W/2, 300);
-  
-  // Instructions
-  ctx.fillStyle = '#fff';
-  ctx.font = '12px monospace';
+  // Instructions — Namco font
   const instructions = [
-    '← → : Move',
-    'Z : Fire',
-    '↑ : Enter Ice Cave',
-    'P : Pause',
-    'R : Restart  Q : Quit'
+    '< > : MOVE',
+    'Z : FIRE',
+    'UP : ENTER ICE CAVE',
+    'P : PAUSE',
+    'R : RESTART  Q : QUIT'
   ];
   for (let i = 0; i < instructions.length; i++) {
-    ctx.fillText(instructions[i], CANVAS_W/2, 350 + i * 22);
+    drawNamcoCenter(instructions[i], 330 + i * 16, '#ccc', 1);
   }
   
-  // Start prompt
-  ctx.fillStyle = '#fff';
-  ctx.font = '16px monospace';
+  // Start prompt — larger, blinking
   const blink = Math.floor(Date.now() / 500) % 2;
-  if (blink) ctx.fillText('Click or tap to start', CANVAS_W/2, 510);
+  if (blink) drawNamcoCenter('CLICK OR TAP TO START', 490, '#fff', 2);
   
   // Mountain silhouette decoration (hidden when box art is loaded)
   if (!sprites['box_art']) {
@@ -2095,25 +2195,18 @@ function renderGameOver() {
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   }
   
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#f00';
-  ctx.font = 'bold 36px monospace';
-  ctx.fillText('GAME OVER', CANVAS_W/2, 220);
+  // Large centered GAME OVER — Namco font (#1, #3)
+  drawNamcoCenter('GAME OVER', 210, '#f00', 3);
   
-  ctx.fillStyle = '#fff';
-  ctx.font = '18px monospace';
-  ctx.fillText('FINAL SCORE: ' + G.score, CANVAS_W/2, 280);
-  ctx.fillText('LEVEL: ' + G.level, CANVAS_W/2, 310);
+  drawNamcoCenter('FINAL SCORE: ' + G.score, 270, '#fff', 1);
+  drawNamcoCenter('LEVEL: ' + G.level, 290, '#fff', 1);
   
-  ctx.fillStyle = '#fff';
-  ctx.font = '14px monospace';
-  ctx.fillText('Press R or click to restart', CANVAS_W/2, 380);
-  ctx.fillText('Press Q for title screen', CANVAS_W/2, 410);
+  drawNamcoCenter('PRESS R OR CLICK TO RESTART', 370, '#ccc', 1);
+  drawNamcoCenter('PRESS Q FOR TITLE SCREEN', 390, '#ccc', 1);
   // Tip jar QR on game over screen
   if(qrImg){
     var qrS=56,qrX=CANVAS_W/2-qrS/2,qrY=CANVAS_H/2+143;
-    ctx.fillStyle='#fff';ctx.font='bold 12px Arial';ctx.textAlign='center';
-    ctx.fillText('Enjoying the game? Tips keep the games coming!',CANVAS_W/2,qrY-10);
+    drawNamcoCenter('TIPS KEEP THE GAMES COMING!', qrY - 14, '#fff', 1);
     ctx.fillStyle='#fff';ctx.fillRect(qrX-3,qrY+7,qrS+6,qrS+6);
     ctx.drawImage(qrImg,qrX,qrY+10,qrS,qrS);
   }
@@ -2122,37 +2215,87 @@ function renderGameOver() {
 function renderTransition() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-  ctx.fillStyle = '#fff';
-  ctx.font = '16px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(G.transitionText, CANVAS_W/2, CANVAS_H/2);
+  
+  // Large centered transition text — Namco font (#3)
+  // Use scale 1 for longer campsite text, scale 2 for shorter ice cave text
+  if (G.transitionText.includes('ICE CAVE')) {
+    drawNamcoCenter(G.transitionText, CANVAS_H/2 - 40, '#fff', 2);
+  } else {
+    drawNamcoCenter('RETURNING TO CAMPSITE', CANVAS_H/2 - 50, '#fff', 2);
+    drawNamcoCenter('LEVEL ' + G.level, CANVAS_H/2 - 22, '#ff0', 2);
+  }
+  
+  // Transition graphic placeholder (#13 ice cave, #16 campsite)
+  if (G.transitionText.includes('ICE CAVE')) {
+    // Ice cave transition graphic — try sprite, fallback to drawn graphic
+    if (!drawSprite(ctx, 'transition_icecave', CANVAS_W/2, CANVAS_H/2 + 30, 120, 120)) {
+      // Fallback: stylized ice crystal
+      ctx.save();
+      ctx.translate(CANVAS_W/2, CANVAS_H/2 + 30);
+      ctx.fillStyle = '#4af';
+      ctx.globalAlpha = 0.6 + Math.sin(Date.now() * 0.003) * 0.3;
+      ctx.beginPath();
+      ctx.moveTo(0, -40); ctx.lineTo(25, -10); ctx.lineTo(25, 20);
+      ctx.lineTo(0, 40); ctx.lineTo(-25, 20); ctx.lineTo(-25, -10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#8cf';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  } else {
+    // Campsite transition graphic — try sprite, fallback to drawn graphic
+    if (!drawSprite(ctx, 'transition_campsite', CANVAS_W/2, CANVAS_H/2 + 30, 120, 120)) {
+      // Fallback: stylized mountain silhouette
+      ctx.save();
+      ctx.translate(CANVAS_W/2, CANVAS_H/2 + 30);
+      ctx.fillStyle = '#446';
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(-50, 30); ctx.lineTo(-20, -30); ctx.lineTo(0, -10);
+      ctx.lineTo(20, -40); ctx.lineTo(50, 30);
+      ctx.closePath();
+      ctx.fill();
+      // Snow caps
+      ctx.fillStyle = '#aac';
+      ctx.beginPath();
+      ctx.moveTo(-20, -30); ctx.lineTo(-12, -18); ctx.lineTo(-28, -18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(20, -40); ctx.lineTo(28, -28); ctx.lineTo(12, -28);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
   
   // Loading dots animation
   const dots = '.'.repeat(Math.floor(G.frameCount / 20) % 4);
-  ctx.fillText(dots, CANVAS_W/2, CANVAS_H/2 + 30);
+  drawNamcoCenter(dots, CANVAS_H/2 + 80, '#fff', 1);
 }
 
 function renderDebug() {
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillRect(0, 0, 200, 140);
-  ctx.fillStyle = '#fff';
-  ctx.font = '10px monospace';
-  ctx.textAlign = 'left';
   const lines = [
     'STATE: ' + G.state,
     'FPS: ' + Math.round(1000 / Math.max(1, lastFrameTime)),
-    'Level: ' + G.level + ' Wave: ' + G.wave,
-    'Elders: ' + G.elderThings.filter(e=>e.active).length,
-    'Shoggoths: ' + G.shoggoths.filter(s=>s.active).length,
-    'P.Proj: ' + G.playerProjectiles.length + ' E.Proj: ' + G.enemyProjectiles.length,
-    'Particles: ' + G.particles.length,
-    'Barriers: ' + G.barriers.filter(b=>b.active).length,
-    'Seal: ' + G.campsite.pieces + '/' + G.campsite.required,
-    'Invincible: ' + (G.player.invincible || G.debugInvincible),
-    'Frame: ' + G.frameCount
+    'LEVEL: ' + G.level + ' WAVE: ' + G.wave,
+    'ELDERS: ' + G.elderThings.filter(e=>e.active).length,
+    'SHOGGOTHS: ' + G.shoggoths.filter(s=>s.active).length,
+    'P.PROJ: ' + G.playerProjectiles.length + ' E.PROJ: ' + G.enemyProjectiles.length,
+    'PARTICLES: ' + G.particles.length,
+    'BARRIERS: ' + G.barriers.filter(b=>b.active).length,
+    'SEAL: ' + G.campsite.pieces + '/' + G.campsite.required,
+    'INVINCIBLE: ' + (G.player.invincible || G.debugInvincible),
+    'FRAME: ' + G.frameCount
   ];
   for (let i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], 4, 12 + i * 12);
+    drawNamco(lines[i], 4, 4 + i * 12, '#0f0', 1);
   }
   
   // Draw hitboxes
@@ -2224,6 +2367,13 @@ function gameLoop(timestamp) {
       
     case 'PLAYING_CAMPSITE':
       updatePlayer(dt);
+      // Delay wave spawn for instruction display (#14)
+      if (G.waveStartDelay > 0) {
+        G.waveStartDelay -= dt;
+        if (G.waveStartDelay <= 0 && G.wave === 0) {
+          spawnWave();
+        }
+      }
       processWaveSpawnQueue(dt);
       updateElderThings(dt);
       updateProjectiles(dt);
@@ -2242,8 +2392,8 @@ function gameLoop(timestamp) {
         G.playerProjectiles = [];
         G.enemyProjectiles = [];
         G.bonusFlyover = null;
-        // Show next wave number (no blink)
-        G.instructionText = 'Wave ' + (G.wave + 1);
+        // Show next wave number
+        G.instructionText = 'WAVE ' + (G.wave + 1);
         G.instructionTimer = 180;
         G.instructionBlink = false;
       }
@@ -2272,12 +2422,6 @@ function gameLoop(timestamp) {
       if (G.waveTransitionTimer <= 0) {
         G.state = 'PLAYING_CAMPSITE';
         spawnWave();
-        // Show stone destruction instructions on first wave
-        if (G.wave === 1) {
-          G.instructionText = 'Destroy the Cyclopean Stones\nto Enter the Cave';
-          G.instructionTimer = 300;
-          G.instructionBlink = false;
-        }
       }
       break;
       
@@ -2506,7 +2650,7 @@ if (typeof window !== 'undefined' && window.__TEST_MODE__) {
     BONUS_FLYOVER_POINTS, BONUS_FIRST_SPAWN_DELAY, BONUS_RESPAWN_MIN,
     BONUS_RESPAWN_MAX, BONUS_MIN_ENEMIES, MAX_PARTICLES, EXTRA_LIFE_INTERVAL,
     STARTING_LIVES, BASE_CAMPSITE_PIECES, MAX_CAMPSITE_PIECES, MAX_ELDER_THINGS,
-    VALID_STATES,
+    VALID_STATES, SHOGGOTH_HP_FULL, SHOGGOTH_HP_HALF, SHOGGOTH_HP_QUARTER,
     // Functions
     overlap, enemyCount, campsitePiecesRequired, enemyFireInterval,
     enemySpeed, enemyProjectileSpeed, diveFrequency, shoggothBaseSpeed,
