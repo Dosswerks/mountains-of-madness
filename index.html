@@ -304,30 +304,60 @@ function drawSprite(ctx, key, x, y, w, h) {
 const AudioMgr = {
   ctx: null, buffers: {}, currentMusic: null, currentMusicGain: null, muted: false,
   _loaded: false, _loading: false,
+  _rawBuffers: {}, _prefetched: false, _prefetching: false,
+  // Pre-fetch raw audio data at page load (no AudioContext needed)
+  async prefetch() {
+    if (this._prefetched || this._prefetching) return;
+    this._prefetching = true;
+    const promises = Object.entries(ASSET_CONFIG.audio).map(async ([key, path]) => {
+      try {
+        const resp = await fetch(path);
+        if (!resp.ok) throw new Error('fetch failed');
+        this._rawBuffers[key] = await resp.arrayBuffer();
+      } catch(e) { this._rawBuffers[key] = null; }
+    });
+    await Promise.all(promises);
+    this._prefetched = true;
+    this._prefetching = false;
+    // If context already exists, decode immediately
+    if (this.ctx && !this._loaded && !this._loading) {
+      this.decodeAll().catch(() => {});
+    }
+  },
   init() {
     if (this.ctx) return;
     try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
     catch(e) { console.warn('AudioContext failed:', e); }
-    // Load audio buffers after context is created (lazy loading)
+    // Decode pre-fetched buffers now that context exists
     if (this.ctx && !this._loaded && !this._loading) {
-      this.loadAll().catch(() => {});
+      this.decodeAll().catch(() => {});
     }
   },
-  async loadAll() {
+  async decodeAll() {
     if (!this.ctx) return;
     if (this._loading) return;
     this._loading = true;
+    // Wait for prefetch if still in progress
+    while (this._prefetching) {
+      await new Promise(r => setTimeout(r, 50));
+    }
     for (const [key, path] of Object.entries(ASSET_CONFIG.audio)) {
       try {
-        const resp = await fetch(path);
-        if (!resp.ok) throw new Error('fetch failed');
-        const buf = await resp.arrayBuffer();
-        this.buffers[key] = await this.ctx.decodeAudioData(buf);
-      } catch(e) { this.buffers[key] = null; console.warn('Audio load failed:', key); }
+        if (this._rawBuffers[key]) {
+          this.buffers[key] = await this.ctx.decodeAudioData(this._rawBuffers[key]);
+          this._rawBuffers[key] = null; // free raw data
+        } else {
+          // Fallback: fetch + decode if prefetch missed this one
+          const resp = await fetch(path);
+          if (!resp.ok) throw new Error('fetch failed');
+          const buf = await resp.arrayBuffer();
+          this.buffers[key] = await this.ctx.decodeAudioData(buf);
+        }
+      } catch(e) { this.buffers[key] = null; }
     }
     this._loaded = true;
     this._loading = false;
-    // Play any music that was requested while loading
+    // Play any music that was requested while decoding
     if (this._pendingMusic) {
       this.playMusic(this._pendingMusic);
     }
@@ -336,6 +366,8 @@ const AudioMgr = {
       this._pendingSFX = null;
     }
   },
+  // Keep loadAll as alias for backward compat
+  async loadAll() { return this.decodeAll(); },
   playSFX(name, vol) {
     if (!this.ctx || this.muted) return;
     if (!this._loaded) {
@@ -2692,8 +2724,8 @@ document.addEventListener('keydown', e => {
 loadSprites();
 initGame();
 
-// Attempt to load audio (will fail gracefully without assets)
-AudioMgr.loadAll().catch(() => {});
+// Attempt to pre-fetch audio files (downloads raw data, no AudioContext needed)
+AudioMgr.prefetch().catch(() => {});
 
 // Start game loop
 requestAnimationFrame(gameLoop);
