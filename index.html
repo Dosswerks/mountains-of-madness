@@ -2111,7 +2111,7 @@ function renderGameOver() {
   ctx.fillText('Press Q for title screen', CANVAS_W/2, 410);
   // Tip jar QR on game over screen
   if(qrImg){
-    var qrS=56,qrX=CANVAS_W/2-qrS/2,qrY=CANVAS_H/2+128;
+    var qrS=56,qrX=CANVAS_W/2-qrS/2,qrY=CANVAS_H/2+143;
     ctx.fillStyle='#fff';ctx.font='bold 12px Arial';ctx.textAlign='center';
     ctx.fillText('Enjoying the game? Tips keep the games coming!',CANVAS_W/2,qrY-10);
     ctx.fillStyle='#fff';ctx.fillRect(qrX-3,qrY-3,qrS+6,qrS+6);
