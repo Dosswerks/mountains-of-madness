@@ -13,18 +13,27 @@ body{background:#0a0a1a;display:flex;justify-content:center;align-items:flex-sta
 #hud span{flex:1;text-align:center}
 canvas{display:block;width:100%;height:auto;border:1px solid #fff}
 #touch-controls{display:none;width:100%;padding:8px 0;justify-content:space-between;align-items:center}
-#touch-left-group{display:flex;gap:8px}
+#touch-left-group{display:flex;gap:10px}
 #touch-center-group{display:flex;justify-content:center}
-#touch-right-group{display:flex;gap:8px}
-.touch-btn{width:60px;height:60px;border:3px solid rgba(255,255,255,0.3);color:#fff;font-size:13px;font-weight:bold;border-radius:50%;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:manipulation;cursor:pointer}
-.touch-btn:active{opacity:0.7;transform:scale(0.93)}
-.touch-red{background:rgba(220,40,40,0.7);border-color:rgba(255,80,80,0.6)}
-.touch-blue{background:rgba(40,80,220,0.7);border-color:rgba(80,120,255,0.6)}
-.touch-purple{background:rgba(140,40,200,0.7);border-color:rgba(180,80,255,0.6)}
-.touch-yellow{background:rgba(200,180,40,0.7);border-color:rgba(240,220,80,0.6);color:#000}
-.tri{display:block;width:0;height:0;border:10px solid transparent}
-.tri-left{border-right-color:#000;border-left:none;margin-right:4px}
-.tri-right{border-left-color:#000;border-right:none;margin-left:4px}
+#touch-right-group{display:flex;gap:10px}
+.touch-btn{width:68px;height:68px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:none;cursor:pointer;transition:transform 0.05s}
+.touch-btn:active{transform:scale(0.93)}
+/* Steampunk base — dark metal plate with brass ring */
+.touch-btn::before{content:'';position:absolute;inset:0;border-radius:50%;background:linear-gradient(180deg,#2a2a28 0%,#1a1a18 40%,#222220 100%);border:3px solid #8a7a50;box-shadow:inset 0 2px 8px rgba(0,0,0,0.8),inset 0 0 0 5px #1a1a18,inset 0 0 0 7px #6a5a38,0 2px 4px rgba(0,0,0,0.5);z-index:0}
+/* Corner rivets */
+.touch-rivet{position:absolute;width:7px;height:7px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#b8a870,#6a5a38 70%,#4a3a20);box-shadow:inset 0 1px 1px rgba(255,255,255,0.2),0 1px 2px rgba(0,0,0,0.5);z-index:2}
+.rv-tl{top:6px;left:6px}.rv-tr{top:6px;right:6px}.rv-bl{bottom:6px;left:6px}.rv-br{bottom:6px;right:6px}
+/* Inner colored button */
+.touch-inner{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:1;font-size:11px;font-weight:bold;font-family:monospace;letter-spacing:1px;text-shadow:0 1px 2px rgba(0,0,0,0.7);color:#c8a832;box-shadow:inset 0 2px 4px rgba(255,255,255,0.15),inset 0 -3px 6px rgba(0,0,0,0.5),0 3px 6px rgba(0,0,0,0.5)}
+.touch-btn:active .touch-inner{box-shadow:inset 0 1px 2px rgba(255,255,255,0.1),inset 0 -2px 4px rgba(0,0,0,0.6),0 1px 3px rgba(0,0,0,0.5)}
+.inner-red{background:radial-gradient(circle at 38% 35%,#c44040,#8a2222 55%,#5a1515 100%);border:2px solid #6a3030}
+.inner-blue{background:radial-gradient(circle at 38% 35%,#4060c4,#223888 55%,#152a5a 100%);border:2px solid #304a6a}
+.inner-purple{background:radial-gradient(circle at 38% 35%,#9040c4,#602288 55%,#3a155a 100%);border:2px solid #5a306a}
+.inner-yellow{background:radial-gradient(circle at 38% 35%,#c4b040,#8a7a22 55%,#5a5015 100%);border:2px solid #6a6030}
+/* Arrow triangles inside yellow buttons */
+.tc-arrow{width:0;height:0;border-top:10px solid transparent;border-bottom:10px solid transparent}
+.tc-arrow-left{border-right:14px solid #c8a832;margin-right:2px}
+.tc-arrow-right{border-left:14px solid #c8a832;margin-left:2px}
 #credits{width:100%;text-align:center;color:#999;font-size:12px;padding:10px 8px 4px;line-height:1.4;font-family:Georgia,'Times New Roman',serif;letter-spacing:0.3px}
 #credits a{color:#c8a832;text-decoration:none}
 #credits a:hover{color:#fff;text-decoration:underline}
@@ -45,20 +54,20 @@ canvas{display:block;width:100%;height:auto;border:1px solid #fff}
   <canvas id="gameCanvas" width="480" height="600"></canvas>
   <div id="touch-controls">
     <div id="touch-left-group">
-      <button class="touch-btn touch-yellow" id="btn-left"><span class="tri tri-left"></span></button>
-      <button class="touch-btn touch-yellow" id="btn-right"><span class="tri tri-right"></span></button>
+      <button class="touch-btn" id="btn-left"><span class="touch-rivet rv-tl"></span><span class="touch-rivet rv-tr"></span><span class="touch-rivet rv-bl"></span><span class="touch-rivet rv-br"></span><span class="touch-inner inner-yellow"><span class="tc-arrow tc-arrow-left"></span></span></button>
+      <button class="touch-btn" id="btn-right"><span class="touch-rivet rv-tl"></span><span class="touch-rivet rv-tr"></span><span class="touch-rivet rv-bl"></span><span class="touch-rivet rv-br"></span><span class="touch-inner inner-yellow"><span class="tc-arrow tc-arrow-right"></span></span></button>
     </div>
     <div id="touch-center-group">
-      <button class="touch-btn touch-purple" id="btn-up">CAVE</button>
+      <button class="touch-btn" id="btn-up"><span class="touch-rivet rv-tl"></span><span class="touch-rivet rv-tr"></span><span class="touch-rivet rv-bl"></span><span class="touch-rivet rv-br"></span><span class="touch-inner inner-purple">CAVE</span></button>
     </div>
     <div id="touch-right-group">
-      <button class="touch-btn touch-blue" id="btn-shield">SH</button>
-      <button class="touch-btn touch-red" id="btn-fire">FIRE</button>
+      <button class="touch-btn" id="btn-shield"><span class="touch-rivet rv-tl"></span><span class="touch-rivet rv-tr"></span><span class="touch-rivet rv-bl"></span><span class="touch-rivet rv-br"></span><span class="touch-inner inner-blue">SH</span></button>
+      <button class="touch-btn" id="btn-fire"><span class="touch-rivet rv-tl"></span><span class="touch-rivet rv-tr"></span><span class="touch-rivet rv-bl"></span><span class="touch-rivet rv-br"></span><span class="touch-inner inner-red">FIRE</span></button>
     </div>
   </div>
   <div id="credits">Based on <a href="https://www.hplovecraft.com/writings/fiction/mm.aspx" target="_blank"><em></em>At the Mountains of Madness</em></a> by H.P. Lovecraft.<br>A game by <a href="https://www.andrewdoss.com" target="_blank">Andrew Doss</a>. &copy; 2026 Andrew Doss. All Rights Reserved.</div>
   <div class="tip-jar-section" style="margin-top:4px;text-align:center;">
-    <p style="font-size:13px;color:#888;line-height:1.3;margin:0 0 4px;">Enjoying the game? Tips help keep the games coming!</p>
+    <p style="font-size:13px;color:#999;line-height:1.3;margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;">Enjoying the game? Tips help keep the games coming!</p>
     <div style="display:flex;align-items:center;justify-content:center;gap:20px;">
       <form action="https://www.paypal.com/donate" method="post" target="_blank">
         <input type="hidden" name="hosted_button_id" value="HDD77QKGC6XXN">
@@ -145,12 +154,12 @@ const BONUS_RESPAWN_MAX = 1200;
 const BONUS_MIN_ENEMIES = 3;
 
 const MAX_PARTICLES = 50;
-const EXTRA_LIFE_INTERVAL = 10000;
+const EXTRA_LIFE_INTERVAL = 5000;
 const STARTING_LIVES = 3;
 const BASE_CAMPSITE_PIECES = 3;
 const MAX_CAMPSITE_PIECES = 8;
-const EXPLOSIVE_W = 20;
-const EXPLOSIVE_H = 20;
+const EXPLOSIVE_W = 40;
+const EXPLOSIVE_H = 40;
 const EXPLOSIVE_COUNTDOWN = 180; // 3 seconds at 60fps
 const EXPLOSIVE_BLAST_RADIUS = 60; // pixels - kills player if too close
 const SEAL_X = CANVAS_W - 80; // right side of screen
@@ -190,7 +199,8 @@ const FONT = {
   '!':[0x18,0x18,0x18,0x18,0x18,0x00,0x18,0x00],'?':[0x3C,0x66,0x06,0x0C,0x18,0x00,0x18,0x00],
   '/':[0x02,0x06,0x0C,0x18,0x30,0x60,0x40,0x00],'+':[0x00,0x18,0x18,0x7E,0x18,0x18,0x00,0x00],
   ',':[0x00,0x00,0x00,0x00,0x00,0x18,0x18,0x30],'(':[0x0C,0x18,0x30,0x30,0x30,0x18,0x0C,0x00],
-  ')':[0x30,0x18,0x0C,0x0C,0x0C,0x18,0x30,0x00]
+  ')':[0x30,0x18,0x0C,0x0C,0x0C,0x18,0x30,0x00],
+  '<':[0x04,0x08,0x10,0x20,0x10,0x08,0x04,0x00],'>':[0x20,0x10,0x08,0x04,0x08,0x10,0x20,0x00]
 };
 
 // Draw a single Namco char at pixel scale
@@ -795,8 +805,12 @@ function addScore(pts, x, y) {
   if (newMult > oldMult) {
     G.lives++;
     G.player.lives = G.lives;
+    // Show large center-screen bonus life message
+    G.instructionText = 'BONUS LIFE EARNED';
+    G.instructionTimer = 120; // ~2 seconds
+    G.instructionBlink = false;
     // Flash effect
-    spawnScoreText(CANVAS_W/2, CANVAS_H/2, '1UP!');
+    spawnScoreText(CANVAS_W/2, CANVAS_H/2 + 40, '1UP!');
     // Req 29.10: Flash the HUD lives counter
     flashHUDLives();
   }
@@ -1210,6 +1224,19 @@ function hitShoggoth(s) {
   return true;
 }
 
+// ---- SHOGGOTH TINT CANVAS (for source-atop yellow flash) ----
+let _shoggothTintCanvas = null;
+let _shoggothTintCtx = null;
+function ensureShoggothTintCanvas(w, h) {
+  if (!_shoggothTintCanvas || _shoggothTintCanvas.width < w || _shoggothTintCanvas.height < h) {
+    _shoggothTintCanvas = document.createElement('canvas');
+    _shoggothTintCanvas.width = Math.max(w, SHOGGOTH_FULL_W);
+    _shoggothTintCanvas.height = Math.max(h, SHOGGOTH_FULL_H);
+    _shoggothTintCtx = _shoggothTintCanvas.getContext('2d');
+  }
+  return _shoggothTintCtx;
+}
+
 function drawShoggoth(ctx, s) {
   if (!s.active) return;
   if (s.invincible && !s.flashVisible && s.spawnZoomTimer <= 0) return;
@@ -1238,7 +1265,23 @@ function drawShoggoth(ctx, s) {
   
   const spriteKey = 'shoggoth_' + s.size + '_' + (s.animFrame + 1);
   if (sprites[spriteKey]) {
-    ctx.drawImage(sprites[spriteKey], -pulseW/2, -pulseH/2, pulseW, pulseH);
+    // If hit flash active, use source-atop tinting to only color opaque pixels
+    if (s.hitFlashTimer > 0) {
+      const tw = Math.ceil(pulseW);
+      const th = Math.ceil(pulseH);
+      const tc = ensureShoggothTintCanvas(tw, th);
+      tc.clearRect(0, 0, _shoggothTintCanvas.width, _shoggothTintCanvas.height);
+      tc.drawImage(sprites[spriteKey], 0, 0, tw, th);
+      tc.globalAlpha = Math.min(0.6, s.hitFlashTimer / 6);
+      tc.globalCompositeOperation = 'source-atop';
+      tc.fillStyle = '#ff0';
+      tc.fillRect(0, 0, tw, th);
+      tc.globalCompositeOperation = 'source-over';
+      tc.globalAlpha = 1;
+      ctx.drawImage(_shoggothTintCanvas, 0, 0, tw, th, -pulseW/2, -pulseH/2, pulseW, pulseH);
+    } else {
+      ctx.drawImage(sprites[spriteKey], -pulseW/2, -pulseH/2, pulseW, pulseH);
+    }
   } else {
     // Fallback colored rectangles
     const colors = { full: '#f00', half: '#f60', quarter: '#fa0' };
@@ -1251,14 +1294,13 @@ function drawShoggoth(ctx, s) {
     ctx.arc(-pulseW*0.2, -pulseH*0.1, eyeSize, 0, Math.PI*2);
     ctx.arc(pulseW*0.2, -pulseH*0.1, eyeSize, 0, Math.PI*2);
     ctx.fill();
-  }
-  
-  // Yellow hit flash overlay
-  if (s.hitFlashTimer > 0) {
-    ctx.globalAlpha = Math.min(1, s.hitFlashTimer / 6) * 0.7;
-    ctx.fillStyle = '#ff0';
-    ctx.fillRect(-pulseW/2, -pulseH/2, pulseW, pulseH);
-    ctx.globalAlpha = 1;
+    // Yellow flash for fallback — just tint the rectangle
+    if (s.hitFlashTimer > 0) {
+      ctx.globalAlpha = Math.min(0.6, s.hitFlashTimer / 6);
+      ctx.fillStyle = '#ff0';
+      ctx.fillRect(-pulseW/2, -pulseH/2, pulseW, pulseH);
+      ctx.globalAlpha = 1;
+    }
   }
   
   ctx.restore();
@@ -1362,7 +1404,7 @@ function updateCampsite(dt) {
       // Check completion — cave opens when no intact boulders remain
       if (!G.campsite.sealSegments.some(s => s.intact)) {
         G.campsite.complete = true;
-        G.instructionText = 'Push Up to Enter the Cave';
+        G.instructionText = 'PRESS UP\nTO ENTER THE CAVE';
         G.instructionTimer = 300;
         G.instructionBlink = false;
       }
@@ -1407,26 +1449,31 @@ function drawCampsiteStructure(ctx) {
     ctx.stroke();
   }
   
-  // Draw placed explosive with countdown
+  // Draw placed explosive
   if (G.campsite.placedExplosive && !G.campsite.placedExplosive.exploded) {
     const exp = G.campsite.placedExplosive;
     // Try TNT sprite, fallback to drawn crate
-    if (!drawSprite(ctx, 'tnt_crate', exp.x, exp.y, 20, 16)) {
+    if (!drawSprite(ctx, 'tnt_crate', exp.x, exp.y, 40, 40)) {
       ctx.fillStyle = '#8B4513';
-      ctx.fillRect(exp.x - 10, exp.y - 8, 20, 16);
+      ctx.fillRect(exp.x - 20, exp.y - 20, 40, 40);
       ctx.strokeStyle = '#5a2d0c';
       ctx.lineWidth = 1;
-      ctx.strokeRect(exp.x - 10, exp.y - 8, 20, 16);
+      ctx.strokeRect(exp.x - 20, exp.y - 20, 40, 40);
+      // Cross planks
+      ctx.strokeStyle = '#6b3410';
+      ctx.beginPath();
+      ctx.moveTo(exp.x - 20, exp.y - 20);
+      ctx.lineTo(exp.x + 20, exp.y + 20);
+      ctx.moveTo(exp.x + 20, exp.y - 20);
+      ctx.lineTo(exp.x - 20, exp.y + 20);
+      ctx.stroke();
     }
-    // Fuse spark
+    // Flashing fuse spark — keep this
     const spark = Math.floor(exp.countdown / 5) % 2;
     ctx.fillStyle = spark ? '#ff0' : '#f80';
     ctx.beginPath();
-    ctx.arc(exp.x, exp.y - 10, 3, 0, Math.PI * 2);
+    ctx.arc(exp.x, exp.y - 24, 4, 0, Math.PI * 2);
     ctx.fill();
-    // Countdown number
-    const secondsLeft = Math.ceil(exp.countdown / 60);
-    drawNamcoCenter(secondsLeft.toString(), exp.y - 26, '#fff', 1);
   }
 }
 
@@ -1436,7 +1483,7 @@ function drawCampsitePieces(ctx) {
     if (!piece.active || piece.pickedUp) continue;
     // Try TNT sprite first, fallback to drawn crate
     if (!drawSprite(ctx, 'tnt_crate', piece.x, piece.y, piece.w, piece.h)) {
-      // Fallback: brown crate with TNT label
+      // Fallback: brown crate
       ctx.fillStyle = '#8B4513';
       ctx.fillRect(piece.x - piece.w/2, piece.y - piece.h/2, piece.w, piece.h);
       ctx.strokeStyle = '#5a2d0c';
@@ -1450,7 +1497,6 @@ function drawCampsitePieces(ctx) {
       ctx.moveTo(piece.x + piece.w/2, piece.y - piece.h/2);
       ctx.lineTo(piece.x - piece.w/2, piece.y + piece.h/2);
       ctx.stroke();
-      drawNamcoCenter('TNT', piece.y - 3, '#ff0', 1);
     }
   }
 }
@@ -1463,20 +1509,20 @@ function drawCampsiteOverlay(ctx) {
       const destroyed = G.campsite.sealSegments.filter(s => !s.intact).length;
       const total = G.campsite.sealSegments.length;
       drawNamcoCenter('SEAL: ' + destroyed + '/' + total, 20, '#fff', 1);
-      // Hint when player tries to enter before seal is destroyed — now centered on screen
+      // Hint when player tries to enter before seal is destroyed — centered on screen, large yellow
       if (G.campsite.hintTimer > 0) {
-        drawNamcoCenter('DESTROY ALL SEAL SEGMENTS', CANVAS_H/2 - 10, '#ff0', 1);
-        drawNamcoCenter('TO OPEN THE CAVE', CANVAS_H/2 + 4, '#ff0', 1);
+        drawNamcoCenter('DESTROY ALL', CANVAS_H/2 - 30, '#ff0', 3);
+        drawNamcoCenter('SEAL SEGMENTS', CANVAS_H/2 + 2, '#ff0', 3);
       }
     }
     
-    // Blinking instruction text (center of screen)
+    // Blinking instruction text (center of screen) — large
     if (G.instructionTimer > 0) {
       const show = G.instructionBlink ? (Math.floor(Date.now() / 500) % 2) : 1;
       if (show) {
         const lines = G.instructionText.split('\n');
         for (let i = 0; i < lines.length; i++) {
-          drawNamcoCenter(lines[i], CANVAS_H/2 - 8 + i * 14, '#fff', 1);
+          drawNamcoCenter(lines[i], CANVAS_H/2 - 16 + i * 28, '#ff0', 3);
         }
       }
     }
@@ -1653,13 +1699,17 @@ function drawPlayer(ctx) {
     ctx.fillRect(p.x - 4, p.y - 2, 8, 10);
   }
   
-  // Draw carried explosive indicator
+  // Draw carried bomb indicator — upper-left corner of player
   if (p.carryingPiece) {
-    if (!drawSprite(ctx, 'tnt_crate', p.x, p.y - p.h/2 - 7, 16, 10)) {
+    const bx = p.x - p.w/2 - 2;
+    const by = p.y - p.h/2 - 2;
+    if (!drawSprite(ctx, 'tnt_crate', bx, by, 16, 16)) {
       ctx.fillStyle = '#8B4513';
-      ctx.fillRect(p.x - 8, p.y - p.h/2 - 12, 16, 10);
+      ctx.fillRect(bx - 8, by - 8, 16, 16);
+      ctx.strokeStyle = '#5a2d0c';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bx - 8, by - 8, 16, 16);
     }
-    drawNamcoCenter('TNT', p.y - p.h/2 - 12, '#ff0', 1);
   }
   
   // Draw shield
@@ -1792,7 +1842,7 @@ function runCollisions() {
         G.bonusDrop = {
           x: G.bonusFlyover.x, y: G.bonusFlyover.y,
           w: 40, h: 40,
-          vy: 6, // fast fall speed
+          vy: 4, // moderate fall speed
           points: G.bonusFlyover.points,
           timer: 300, // ~5 seconds on the ground before disappearing
           grounded: false
@@ -1978,7 +2028,7 @@ function enterCampsite() {
   
   // Show instruction text immediately, delay wave spawn (#14)
   if (G.level === 1) {
-    G.instructionText = 'DESTROY THE CYCLOPEAN STONES\nTO ENTER THE CAVE';
+    G.instructionText = 'DESTROY THE STONES\nTO ENTER THE CAVE';
     G.instructionTimer = 180; // ~3 seconds
     G.instructionBlink = false;
     G.waveStartDelay = 180; // delay wave spawn so instructions are visible
@@ -2155,25 +2205,29 @@ function renderStartScreen() {
     drawSprite(ctx, 'box_art', CANVAS_W/2, CANVAS_H/2, CANVAS_W, CANVAS_H);
   }
   
-  // Subtitle — Namco font, larger center text (#1, #3)
-  drawNamcoCenter('MOUNTAINS OF MADNESS', 270, '#fff', 2);
-  drawNamcoCenter('LOVECRAFT ARCADE VOLUME 1', 296, '#aaa', 1);
+  // Title — Namco font, large center text (#1, #3)
+  drawNamcoCenter('MOUNTAINS OF', 260, '#fff', 3);
+  drawNamcoCenter('MADNESS', 288, '#fff', 3);
+  drawNamcoCenter('LOVECRAFT ARCADE VOLUME 1', 316, '#aaa', 1);
   
   // Instructions — Namco font
   const instructions = [
-    '< > : MOVE',
+    'ARROWS : MOVE',
     'Z : FIRE',
     'UP : ENTER ICE CAVE',
     'P : PAUSE',
     'R : RESTART  Q : QUIT'
   ];
   for (let i = 0; i < instructions.length; i++) {
-    drawNamcoCenter(instructions[i], 330 + i * 16, '#ccc', 1);
+    drawNamcoCenter(instructions[i], 346 + i * 16, '#ccc', 1);
   }
   
-  // Start prompt — larger, blinking
+  // Start prompt — large, blinking, scale 3
   const blink = Math.floor(Date.now() / 500) % 2;
-  if (blink) drawNamcoCenter('CLICK OR TAP TO START', 490, '#fff', 2);
+  if (blink) {
+    drawNamcoCenter('CLICK OR TAP', 480, '#fff', 3);
+    drawNamcoCenter('TO START', 508, '#fff', 3);
+  }
   
   // Mountain silhouette decoration (hidden when box art is loaded)
   if (!sprites['box_art']) {
@@ -2196,13 +2250,14 @@ function renderGameOver() {
   }
   
   // Large centered GAME OVER — Namco font (#1, #3)
-  drawNamcoCenter('GAME OVER', 210, '#f00', 3);
+  drawNamcoCenter('GAME OVER', 200, '#f00', 3);
   
-  drawNamcoCenter('FINAL SCORE: ' + G.score, 270, '#fff', 1);
-  drawNamcoCenter('LEVEL: ' + G.level, 290, '#fff', 1);
+  drawNamcoCenter('FINAL SCORE: ' + G.score, 260, '#fff', 2);
+  drawNamcoCenter('LEVEL: ' + G.level, 286, '#fff', 2);
   
-  drawNamcoCenter('PRESS R OR CLICK TO RESTART', 370, '#ccc', 1);
-  drawNamcoCenter('PRESS Q FOR TITLE SCREEN', 390, '#ccc', 1);
+  drawNamcoCenter('PRESS R OR CLICK', 350, '#ccc', 1);
+  drawNamcoCenter('TO RESTART', 366, '#ccc', 1);
+  drawNamcoCenter('PRESS Q FOR TITLE', 390, '#ccc', 1);
   // Tip jar QR on game over screen
   if(qrImg){
     var qrS=56,qrX=CANVAS_W/2-qrS/2,qrY=CANVAS_H/2+143;
@@ -2216,13 +2271,14 @@ function renderTransition() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
   
-  // Large centered transition text — Namco font (#3)
-  // Use scale 1 for longer campsite text, scale 2 for shorter ice cave text
+  // Large centered transition text — Namco font, scale 3
   if (G.transitionText.includes('ICE CAVE')) {
-    drawNamcoCenter(G.transitionText, CANVAS_H/2 - 40, '#fff', 2);
+    drawNamcoCenter('ENTERING THE', CANVAS_H/2 - 60, '#fff', 3);
+    drawNamcoCenter('ICE CAVE...', CANVAS_H/2 - 30, '#fff', 3);
   } else {
-    drawNamcoCenter('RETURNING TO CAMPSITE', CANVAS_H/2 - 50, '#fff', 2);
-    drawNamcoCenter('LEVEL ' + G.level, CANVAS_H/2 - 22, '#ff0', 2);
+    drawNamcoCenter('RETURNING TO', CANVAS_H/2 - 60, '#fff', 3);
+    drawNamcoCenter('THE CAMPSITE', CANVAS_H/2 - 30, '#fff', 3);
+    drawNamcoCenter('LEVEL ' + G.level, CANVAS_H/2 + 4, '#ff0', 3);
   }
   
   // Transition graphic placeholder (#13 ice cave, #16 campsite)

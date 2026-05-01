@@ -29,6 +29,7 @@ Touch controls appear automatically on mobile (≤500px viewport).
 5. Press Up to enter the Ice Cave and battle the Shoggoth boss
 6. Shoggoths require 3 hits per phase (full → 2 halves → 4 quarters), flashing yellow on each hit
 7. Defeat all Shoggoths to advance to the next level with increased difficulty
+8. Bonus life every 5,000 points
 
 ## Architecture
 
@@ -55,7 +56,7 @@ Place PNG files in `assets/` matching these keys. The game draws procedural fall
 | `shoggoth_full_1/2.png` | Full Shoggoth frames | 256×192 |
 | `shoggoth_half_1/2.png` | Half Shoggoth frames | 160×128 |
 | `shoggoth_quarter_1/2.png` | Quarter Shoggoth frames | 96×80 |
-| `tnt_crate.png` | TNT explosive crate | 20×20 |
+| `tnt_crate.png` | TNT explosive crate | 40×40 |
 | `bonus_flyover.png` | Bonus UFO | 40×40 |
 | `bonus_drop.png` | Dropped bonus pickup | 40×40 |
 | `seal_boulder.png` | Cave seal boulder | 36×30 |
@@ -85,10 +86,12 @@ Place MP3 files in `assets/`. All audio fails gracefully to silence.
 
 ## Mobile Touch Controls
 
-- Left/Right: Yellow round buttons with black triangle arrows
-- Fire: Red round button
-- Shield: Blue round button
-- Cave (Up): Purple round button, centered between the groups
+Steampunk-styled round buttons with brass rings and corner rivets, matching the Lovecraft Arcade series aesthetic:
+
+- Left/Right: Yellow inner buttons with brass arrow indicators on dark metal plates
+- Fire: Red inner button
+- Shield: Blue inner button
+- Cave (Up): Purple inner button, centered between the left and right groups
 
 ## Difficulty Scaling
 
@@ -112,21 +115,23 @@ Press backtick (`` ` ``) to toggle debug overlay. Debug commands:
 
 ## Recent Changes
 
-- All in-game text now uses the Namco 8×8 pixel font at configurable scales, matching the Lovecraft Arcade series style
-- Footer/credits use Georgia serif font, consistent across Lovecraft Arcade titles
-- Center-screen text (title, game over, paused, transitions) rendered at 2–3× scale for visibility
-- "Destroy all seal segments" hint moved to center screen for better visibility
-- TNT crate uses custom sprite (`tnt_crate.png`) with brown crate fallback instead of white square
-- Shoggoths now require 3 hits per phase with yellow flash on each hit
+- All in-game text uses the Namco 8×8 pixel font at configurable scales (1×, 2×, 3×), matching the Lovecraft Arcade series style
+- All center-screen text (title, game over, paused, transitions, wave announcements, instructions) rendered at 3× scale for maximum visibility, in yellow
+- Footer/credits and tip jar text use Georgia serif font, consistent across Lovecraft Arcade titles
+- "Destroy all seal segments" hint moved to center screen in large yellow text
+- TNT crate is now 40×40 pixels, uses custom sprite (`tnt_crate.png`) with brown crate fallback; no text label or countdown number, just a flashing fuse spark
+- Carried bomb indicator positioned at upper-left corner of the player sprite
+- Shoggoths require 3 hits per phase with yellow flash using `source-atop` compositing (only the creature pixels are tinted, not transparent areas)
 - Shoggoth projectile fire rate significantly reduced for better playability
-- Bonus drop falls much faster after shooting the flyover
-- Sound effects added for bomb placement and bonus collection
-- Mobile touch buttons redesigned: round, color-coded (Fire=red, Shield=blue, Cave=purple, Move=yellow with black triangles), Cave button centered
+- Bonus drop falls at moderate speed (4 px/frame) after shooting the flyover
+- Sound effects for bomb placement and bonus collection
+- Bonus life earned every 5,000 points with large on-screen "BONUS LIFE EARNED" message
+- Mobile touch buttons redesigned with steampunk/early 20th century aesthetic: round brass-ringed buttons with corner rivets, dark metal plate backgrounds (Fire=red, Shield=blue, Cave=purple, Move=yellow with brass arrow indicators), Cave button centered
 - Music starts during transition screens (ice cave music on "Entering the Ice Cave", campsite music on "Returning to Campsite")
 - Transition screens include centered graphic placeholders (sprites: `transition_icecave.png`, `transition_campsite.png`)
 - First level instruction text appears immediately with a brief delay before enemies spawn
 - Elder Thing explosions are larger with yellow particles and flash effect
-- "Returning to Campsite" transition shows level number prominently
+- Transition screens show text at 3× scale with level number in yellow
 
 ## License
 
