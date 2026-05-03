@@ -265,14 +265,14 @@ const ASSET_CONFIG = {
   audio: {
     music_campsite:'assets/music_campsite.mp3',music_icecave:'assets/music_icecave.mp3',
     sfx_player_fire:'assets/sfx_player_fire.mp3',sfx_player_hit:'assets/sfx_player_hit.mp3',
-    sfx_elder_destroy:'assets/sfx_elder_destroy.mp3',sfx_elder_fire:'assets/sfx_elder_fire.mp3',
+    sfx_elder_destroy:'assets/sfx_elder_destroy.mp3',
     sfx_shoggoth_split:'assets/sfx_shoggoth_split.mp3',sfx_shoggoth_destroy:'assets/sfx_shoggoth_destroy.mp3',
-    sfx_bonus_appear:'assets/sfx_bonus_appear.mp3',sfx_bonus_hit:'assets/sfx_bonus_hit.mp3',
-    sfx_piece_pickup:'assets/sfx_piece_pickup.mp3',sfx_piece_place:'assets/sfx_piece_place.mp3',
-    sfx_campsite_complete:'assets/sfx_campsite_complete.mp3',sfx_seal_explosion:'assets/sfx_seal_explosion.mp3',sfx_barrier_hit:'assets/sfx_barrier_hit.mp3',
-    sfx_transition:'assets/sfx_transition.mp3',sfx_wave_start:'assets/sfx_wave_start.mp3',
+    sfx_bonus_flyover:'assets/sfx_bonus_flyover.mp3',sfx_bonus_collect:'assets/sfx_bonus_collect.mp3',
+    sfx_piece_pickup:'assets/sfx_piece_pickup.mp3',
+    sfx_seal_explosion:'assets/sfx_seal_explosion.mp3',
+    sfx_wave_start:'assets/sfx_wave_start.mp3',
     sfx_game_over:'assets/sfx_game_over.mp3',sfx_game_start:'assets/sfx_game_start.mp3',sfx_boss_start:'assets/sfx_boss_start.mp3',
-    sfx_bomb_place:'assets/sfx_bomb_place.mp3',sfx_bonus_collect:'assets/sfx_bonus_collect.mp3'
+    sfx_bomb_place:'assets/sfx_bomb_place.mp3'
   }
 };
 
@@ -345,14 +345,17 @@ const AudioMgr = {
     }
     try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
     catch(e) { console.warn('AudioContext failed:', e); }
-    // Resume if suspended (required by mobile browsers' autoplay policy)
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
-    }
-    // Decode pre-fetched buffers now that context exists
-    if (this.ctx && !this._loaded && !this._loading) {
-      this.decodeAll().catch(() => {});
-    }
+    if (!this.ctx) return;
+    // Resume must complete before decoding on iOS Safari
+    const doInit = async () => {
+      if (this.ctx.state === 'suspended') {
+        try { await this.ctx.resume(); } catch(e) {}
+      }
+      if (!this._loaded && !this._loading) {
+        await this.decodeAll().catch(() => {});
+      }
+    };
+    doInit();
   },
   async decodeAll() {
     if (!this.ctx) return;
@@ -362,12 +365,19 @@ const AudioMgr = {
     while (this._prefetching) {
       await new Promise(r => setTimeout(r, 50));
     }
+    // Ensure context is running before decoding (iOS requires this)
+    if (this.ctx.state === 'suspended') {
+      try { await this.ctx.resume(); } catch(e) {}
+    }
     for (const [key, path] of Object.entries(ASSET_CONFIG.audio)) {
       try {
         if (this._rawBuffers[key]) {
-          this.buffers[key] = await this.ctx.decodeAudioData(this._rawBuffers[key]);
+          // Clone the buffer before decoding — iOS Safari detaches the original,
+          // making retry impossible if decode fails
+          const clone = this._rawBuffers[key].slice(0);
+          this.buffers[key] = await this.ctx.decodeAudioData(clone);
           this._rawBuffers[key] = null; // free raw data
-        } else {
+        } else if (!this.buffers[key]) {
           // Fallback: fetch + decode if prefetch missed this one
           const resp = await fetch(path);
           if (!resp.ok) throw new Error('fetch failed');
