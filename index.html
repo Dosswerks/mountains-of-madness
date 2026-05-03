@@ -312,193 +312,156 @@ function drawSprite(ctx, key, x, y, w, h) {
 }
 
 // ---- AUDIO MANAGER ----
+// Hybrid approach: HTML5 Audio elements for SFX (reliable on iOS Safari),
+// Web Audio API only for music (gapless looping).
 const AudioMgr = {
-  ctx: null, buffers: {}, currentMusic: null, currentMusicGain: null, muted: false,
-  _loaded: false, _loading: false,
-  _rawBuffers: {}, _prefetched: false, _prefetching: false,
-  // Pre-fetch raw audio data at page load (no AudioContext needed)
-  async prefetch() {
-    if (this._prefetched || this._prefetching) return;
-    this._prefetching = true;
-    const promises = Object.entries(ASSET_CONFIG.audio).map(async ([key, path]) => {
-      try {
-        const resp = await fetch(path);
-        if (!resp.ok) throw new Error('fetch failed');
-        this._rawBuffers[key] = await resp.arrayBuffer();
-      } catch(e) { this._rawBuffers[key] = null; }
-    });
-    await Promise.all(promises);
-    this._prefetched = true;
-    this._prefetching = false;
-    // If context already exists, decode immediately
-    if (this.ctx && !this._loaded && !this._loading) {
-      this.decodeAll().catch(() => {});
-    }
-  },
-  init() {
-    if (this.ctx) {
-      // Context exists but may be suspended (mobile browsers) — resume on each user gesture
-      if (this.ctx.state === 'suspended') {
-        this.ctx.resume().catch(() => {});
-      }
-      return;
-    }
-    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
-    catch(e) { console.warn('AudioContext failed:', e); }
-    if (!this.ctx) return;
-    // Resume must complete before decoding on iOS Safari
-    const doInit = async () => {
-      if (this.ctx.state === 'suspended') {
-        try { await this.ctx.resume(); } catch(e) {}
-      }
-      if (!this._loaded && !this._loading) {
-        await this.decodeAll().catch(() => {});
-      }
-    };
-    doInit();
-  },
-  async decodeAll() {
-    if (!this.ctx) return;
-    if (this._loading) return;
-    this._loading = true;
-    // Wait for prefetch if still in progress
-    while (this._prefetching) {
-      await new Promise(r => setTimeout(r, 50));
-    }
-    // Ensure context is running before decoding (iOS requires this)
-    if (this.ctx.state === 'suspended') {
-      try { await this.ctx.resume(); } catch(e) {}
-    }
+  // SFX — HTML5 Audio elements (no AudioContext needed, works on iOS)
+  _sfx: {},
+  // Music — Web Audio API for gapless looping
+  _musicCtx: null, _musicBuffer: {}, _musicSource: null, _musicGain: null,
+  _pendingMusic: null,
+  muted: false,
+  musicPaused: false,
+  musicWasPlaying: false,
+
+  // Pre-load SFX as Audio elements and fetch music ArrayBuffers
+  prefetch() {
+    // Load all SFX as Audio elements
     for (const [key, path] of Object.entries(ASSET_CONFIG.audio)) {
+      if (key.startsWith('music_')) continue; // music handled separately
       try {
-        if (this._rawBuffers[key]) {
-          // Clone the buffer before decoding — iOS Safari detaches the original,
-          // making retry impossible if decode fails
-          const clone = this._rawBuffers[key].slice(0);
-          this.buffers[key] = await this.ctx.decodeAudioData(clone);
-          this._rawBuffers[key] = null; // free raw data
-        } else if (!this.buffers[key]) {
-          // Fallback: fetch + decode if prefetch missed this one
-          const resp = await fetch(path);
-          if (!resp.ok) throw new Error('fetch failed');
-          const buf = await resp.arrayBuffer();
-          this.buffers[key] = await this.ctx.decodeAudioData(buf);
-        }
-      } catch(e) { this.buffers[key] = null; }
+        const audio = new Audio(path);
+        audio.volume = 0.5;
+        audio.preload = 'auto';
+        this._sfx[key] = audio;
+      } catch(e) {}
     }
-    this._loaded = true;
-    this._loading = false;
-    // Play any music that was requested while decoding
-    if (this._pendingMusic) {
-      this.playMusic(this._pendingMusic);
-    }
-    if (this._pendingSFX) {
-      this.playSFX(this._pendingSFX.name, this._pendingSFX.vol);
-      this._pendingSFX = null;
+    // Pre-fetch music files as ArrayBuffers (decoded later when context exists)
+    for (const [key, path] of Object.entries(ASSET_CONFIG.audio)) {
+      if (!key.startsWith('music_')) continue;
+      fetch(path).then(r => r.ok ? r.arrayBuffer() : null)
+        .then(buf => { if (buf) this._musicBuffer[key] = buf; })
+        .catch(() => {});
     }
   },
-  // Keep loadAll as alias for backward compat
-  async loadAll() { return this.decodeAll(); },
-  playSFX(name, vol) {
-    if (!this.ctx || this.muted) return;
-    if (!this._loaded) {
-      this._pendingSFX = { name, vol };
-      return;
+
+  // Called on user gesture — creates music AudioContext if needed
+  init() {
+    if (!this._musicCtx) {
+      try {
+        this._musicCtx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch(e) {}
     }
-    if (!this.buffers[name]) return;
+    if (this._musicCtx && this._musicCtx.state === 'suspended') {
+      this._musicCtx.resume().catch(() => {});
+    }
+  },
+
+  // Play a sound effect using HTML5 Audio (iOS-compatible)
+  playSFX(name, vol) {
+    if (this.muted) return;
+    const audio = this._sfx[name];
+    if (!audio) return;
     try {
-      const src = this.ctx.createBufferSource();
-      src.buffer = this.buffers[name];
-      if (vol !== undefined && vol < 1) {
-        const gain = this.ctx.createGain();
-        gain.gain.value = vol;
-        src.connect(gain);
-        gain.connect(this.ctx.destination);
-      } else {
-        src.connect(this.ctx.destination);
-      }
-      src.start(0);
+      const clone = audio.cloneNode();
+      clone.volume = (vol !== undefined && vol < 1) ? vol : 0.5;
+      clone.play().catch(() => {});
     } catch(e) {}
   },
-  // Play a SFX and return a handle that can be stopped later
+
+  // Play a SFX and return a handle that can be stopped
   playSFXTracked(name, vol) {
-    if (!this.ctx || this.muted) return null;
-    if (!this._loaded || !this.buffers[name]) return null;
+    if (this.muted) return null;
+    const audio = this._sfx[name];
+    if (!audio) return null;
     try {
-      const src = this.ctx.createBufferSource();
-      src.buffer = this.buffers[name];
-      if (vol !== undefined && vol < 1) {
-        const gain = this.ctx.createGain();
-        gain.gain.value = vol;
-        src.connect(gain);
-        gain.connect(this.ctx.destination);
-      } else {
-        src.connect(this.ctx.destination);
-      }
-      src.start(0);
-      return src;
+      const clone = audio.cloneNode();
+      clone.volume = (vol !== undefined && vol < 1) ? vol : 0.5;
+      clone.play().catch(() => {});
+      return clone;
     } catch(e) { return null; }
   },
-  playMusic(track) {
-    if (!this.ctx) return;
+
+  // Play looping music via Web Audio API
+  async playMusic(track) {
     const key = 'music_' + track;
-    // If buffers aren't loaded yet, wait for them then play
-    if (!this._loaded) {
+    if (!this._musicCtx) {
       this._pendingMusic = track;
       return;
     }
-    this._pendingMusic = null;
-    if (!this.buffers[key]) { this.stopMusic(); return; }
+    // Ensure context is running
+    if (this._musicCtx.state === 'suspended') {
+      try { await this._musicCtx.resume(); } catch(e) {}
+    }
+    // Decode buffer if not yet decoded
+    if (this._musicBuffer[key] instanceof ArrayBuffer) {
+      try {
+        const decoded = await this._musicCtx.decodeAudioData(this._musicBuffer[key]);
+        this._musicBuffer[key] = decoded; // replace ArrayBuffer with AudioBuffer
+      } catch(e) { this._musicBuffer[key] = null; return; }
+    }
+    const buffer = this._musicBuffer[key];
+    if (!buffer) return;
+    // Stop current music with crossfade
+    this._stopMusicInternal(0.5);
+    // Start new track
     try {
-      // Crossfade: fade out old track over 0.5s, fade in new track
-      const now = this.ctx.currentTime;
-      if (this.currentMusic && this.currentMusicGain) {
-        const oldSrc = this.currentMusic;
-        const oldGain = this.currentMusicGain;
-        oldGain.gain.setValueAtTime(oldGain.gain.value, now);
-        oldGain.gain.linearRampToValueAtTime(0, now + 0.5);
-        try { oldSrc.stop(now + 0.5); } catch(e) {}
-      }
-      const src = this.ctx.createBufferSource();
-      const gain = this.ctx.createGain();
-      src.buffer = this.buffers[key];
+      const src = this._musicCtx.createBufferSource();
+      const gain = this._musicCtx.createGain();
+      src.buffer = buffer;
       src.loop = true;
       src.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this._musicCtx.destination);
       const targetVol = this.muted ? 0 : 0.5;
+      const now = this._musicCtx.currentTime;
       gain.gain.setValueAtTime(0, now);
       gain.gain.linearRampToValueAtTime(targetVol, now + 0.5);
       src.start(0);
-      this.currentMusic = src;
-      this.currentMusicGain = gain;
+      this._musicSource = src;
+      this._musicGain = gain;
     } catch(e) {}
+    this._pendingMusic = null;
   },
-  stopMusic() {
-    if (this.currentMusic) {
-      try { this.currentMusic.stop(); } catch(e) {}
-      this.currentMusic = null;
-      this.currentMusicGain = null;
+
+  _stopMusicInternal(fadeTime) {
+    if (this._musicSource && this._musicGain && this._musicCtx) {
+      try {
+        const now = this._musicCtx.currentTime;
+        this._musicGain.gain.setValueAtTime(this._musicGain.gain.value, now);
+        this._musicGain.gain.linearRampToValueAtTime(0, now + (fadeTime || 0));
+        this._musicSource.stop(now + (fadeTime || 0));
+      } catch(e) {}
     }
+    this._musicSource = null;
+    this._musicGain = null;
+  },
+
+  stopMusic() {
+    this._stopMusicInternal(0);
     this.musicPaused = false;
     this.musicWasPlaying = false;
   },
+
   pauseMusic() {
-    if (this.ctx && this.currentMusic) {
-      try { this.ctx.suspend(); this.musicPaused = true; this.musicWasPlaying = true; } catch(e) {}
+    if (this._musicCtx && this._musicSource) {
+      try { this._musicCtx.suspend(); this.musicPaused = true; this.musicWasPlaying = true; } catch(e) {}
     } else {
       this.musicPaused = false;
       this.musicWasPlaying = false;
     }
   },
+
   resumeMusic() {
-    if (this.ctx && this.musicWasPlaying) {
-      try { this.ctx.resume(); this.musicPaused = false; } catch(e) {}
+    if (this._musicCtx && this.musicWasPlaying) {
+      try { this._musicCtx.resume(); this.musicPaused = false; } catch(e) {}
     }
     this.musicWasPlaying = false;
   },
-  musicPaused: false,
-  musicWasPlaying: false,
-  setMuted(m) { this.muted = m; if (this.currentMusicGain) this.currentMusicGain.gain.value = m ? 0 : 0.5; }
+
+  setMuted(m) {
+    this.muted = m;
+    if (this._musicGain) this._musicGain.gain.value = m ? 0 : 0.5;
+  }
 };
 
 // ---- INPUT MANAGER ----
@@ -1570,7 +1533,7 @@ function updateCampsite(dt) {
       exp.exploded = true;
       // Stop the bomb timer beeping sound
       if (exp.timerSound) {
-        try { exp.timerSound.stop(); } catch(e) {}
+        try { exp.timerSound.pause(); } catch(e) {}
         exp.timerSound = null;
       }
       // Big explosion
@@ -2933,8 +2896,8 @@ document.addEventListener('keydown', e => {
 loadSprites();
 initGame();
 
-// Attempt to pre-fetch audio files (downloads raw data, no AudioContext needed)
-AudioMgr.prefetch().catch(() => {});
+// Pre-load SFX and fetch music data
+AudioMgr.prefetch();
 
 // Start game loop
 requestAnimationFrame(gameLoop);
