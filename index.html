@@ -336,9 +336,19 @@ const AudioMgr = {
     }
   },
   init() {
-    if (this.ctx) return;
+    if (this.ctx) {
+      // Context exists but may be suspended (mobile browsers) — resume on each user gesture
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+      return;
+    }
     try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
     catch(e) { console.warn('AudioContext failed:', e); }
+    // Resume if suspended (required by mobile browsers' autoplay policy)
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
     // Decode pre-fetched buffers now that context exists
     if (this.ctx && !this._loaded && !this._loading) {
       this.decodeAll().catch(() => {});
